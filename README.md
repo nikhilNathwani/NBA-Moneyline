@@ -57,11 +57,11 @@ scrape/
 ## API Endpoints
 
 - `POST /api/result-summary`
-  - Input: `seasonStartYear`, `team`, `prediction`, `wager`
-  - Output: aggregated outcomes grouped by favorite/underdog and result
+    - Input: `seasonStartYear`, `team`, `prediction`, `wager`
+    - Output: aggregated outcomes grouped by favorite/underdog and result
 - `POST /api/top-bets`
-  - Input: same payload
-  - Output: highest-earning individual bets for the chosen strategy
+    - Input: same payload
+    - Output: highest-earning individual bets for the chosen strategy
 
 ## Getting Started
 
