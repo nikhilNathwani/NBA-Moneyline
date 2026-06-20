@@ -10,7 +10,19 @@ from core.game import Game
 
 # Construct URL for a given season and page number.
 def makeUrl(seasonStartYear: int, pageNum: int) -> str:
-    return f"https://www.oddsportal.com/basketball/usa/nba-{seasonStartYear}-{seasonStartYear+1}/results/#/page/{pageNum}/"
+    # Hardcoding for 2025-26 scrape since oddsportal changed their URL structure 
+    return f"https://www.oddsportal.com/basketball/usa/nba/results/#/page/{pageNum}/"
+
+    # return f"https://www.oddsportal.com/basketball/usa/nba-{seasonStartYear}-{seasonStartYear+1}/results/#/page/{pageNum}/"
+
+#url format: https://www.oddsportal.com/basketball/usa/nba/results/#/page/2/
+def getPageNumFromUrl(url: str) -> int:
+    import re
+    match = re.search(r'/page/(\d+)/', url)
+    if match:
+        return int(match.group(1))
+    else:
+        raise ValueError(f"Page number not found in URL: {url}")
 
 # Get the last page number for pagination.    
 def getLastPageNum(soup) -> int: 
