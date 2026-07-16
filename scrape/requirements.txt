@@ -1,5 +1,5 @@
 # ============================================
-# DIRECT DEPENDENCIES (packages you import)
+# DIRECT DEPENDENCIES (packages to import)
 # ============================================
 
 # Web scraping - Browser automation
