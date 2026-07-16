@@ -10,7 +10,6 @@ this scraper may need updates.
 
 from typing import List, Dict
 from core.game import Game
-from core.base_scraper import BaseScraper
 from core.selenium_webdriver import SeleniumWebDriver
 from oddsportal.helpers import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
@@ -18,7 +17,7 @@ from oddsportal.helpers import (
 )
 
 
-class OddsPortalScraper(BaseScraper, SeleniumWebDriver):
+class OddsPortalScraper(SeleniumWebDriver):
     """
     Scraper for OddsPortal NBA moneyline data.
     
