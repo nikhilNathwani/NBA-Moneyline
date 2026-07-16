@@ -4,6 +4,13 @@ scraper: everything parameterized purely by its arguments, no live driver
 access, which is what makes it independently unit-testable (see
 test_urls.py, test_parsing.py) without any Selenium setup.
 
+Owns all BeautifulSoup construction - every function here that needs one
+takes a raw HTML string and builds it internally, rather than the caller
+pre-building one. scraper.py never touches BeautifulSoup directly; it
+only ever passes raw HTML strings or already-parsed elements (a row, a
+gameRow) across the boundary, and gets back primitives, lists of
+elements, or structured results.
+
 Includes the row-level and detail-page-level odds/winner extraction too -
 "parsing" here means interpreting HTML already in hand, whether that HTML
 came from the main results page or a live re-fetch of a game's detail
@@ -15,6 +22,8 @@ what comes back from it.
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Dict, Optional
+
+from bs4 import BeautifulSoup
 
 from util.game import Game
 
@@ -38,8 +47,9 @@ def makeCurrentSeasonUrl(pageNum: int) -> str:
 def urlMatchesRequestedSeason(url: str, seasonStartYear: int) -> bool:
     return f"nba-{seasonStartYear}-{seasonStartYear+1}" in url
 
-# Get the last page number for pagination.
-def getLastPageNum(soup) -> int:
+# Get the last page number for pagination, from a season-results page's HTML.
+def getLastPageNum(html: str) -> int:
+    soup = BeautifulSoup(html, "lxml")
     pagination_links = soup.select('.pagination-link[data-number]')
     if pagination_links:
         last_link = pagination_links[-1]
@@ -48,6 +58,12 @@ def getLastPageNum(soup) -> int:
     else:
         print(f"No pagination links found, defaulting to 1 page")
         return 1
+
+# Parse a results page's HTML into its list of eventRow elements (a mix of
+# date headers and game rows).
+def parseGameRows(html: str) -> list:
+    soup = BeautifulSoup(html, "lxml")
+    return soup.find_all(class_="eventRow")
 
 # Get the date header row for a game row (if present).
 def getDateHeaderRow(gameRow):
@@ -70,6 +86,30 @@ def countGameDataRows(gameRows) -> tuple:
     non_header_rows = len(gameRows) - header_count
     rows_with_game_data = sum(1 for r in gameRows if r.select_one('[data-testid="game-row"]') is not None)
     return non_header_rows, rows_with_game_data
+
+# Find the game-row div within a results-page row and the two team names
+# within it.
+def extractGameRowAndTeamNames(row) -> Optional[tuple]:
+    """
+    Returns:
+        Optional[tuple]: (gameRow, homeTeamName, awayTeamName), or None if
+        the row doesn't have a game-row div or doesn't have both team
+        names (caller should skip the row - there's nothing here to fall
+        back on).
+    """
+    gameRow = row.select_one('[data-testid="game-row"]')
+    if not gameRow:
+        print("  ⚠️  No game-row found in row, skipping")
+        return None
+
+    teams = gameRow.select('p.participant-name')
+    if len(teams) < 2:
+        print(f"  ⚠️  Not enough team names found (found {len(teams)}), skipping game")
+        return None
+
+    homeTeamName = teams[0].text.strip()
+    awayTeamName = teams[1].text.strip()
+    return gameRow, homeTeamName, awayTeamName
 
 
 class RowOddsResult(Enum):
@@ -114,12 +154,13 @@ def findDetailPageLink(row) -> Optional[str]:
 # Parse odds and determine the winner from a game's detail page, given its
 # already-fetched HTML and the original row (winner detection reads the
 # row, not the detail page - the detail page doesn't mark it the same way).
-def extractOddsFromDetailSoup(detail_soup, row) -> tuple:
+def extractOddsFromDetailHtml(detail_html: str, row) -> tuple:
     """
     Returns:
         tuple: (homeWon, awayWon, homeWinOdds, awayWinOdds). homeWinOdds/
         awayWinOdds are -1 if odds couldn't be found/parsed at all.
     """
+    detail_soup = BeautifulSoup(detail_html, "lxml")
     odds_elements = detail_soup.select('[data-testid="odd-container"]')
 
     if len(odds_elements) < 2:

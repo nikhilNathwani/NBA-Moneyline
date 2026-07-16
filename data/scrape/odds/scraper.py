@@ -29,7 +29,6 @@ import os
 import time
 from typing import List, Dict, Optional
 
-from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -39,9 +38,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from util.game import Game
 from scrape.odds.parser import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
-    getLastPageNum, getDateHeaderRow, isRegularSeason, countGameDataRows,
-    RowOddsResult, extractOddsAndWinnerFromRow, findDetailPageLink,
-    extractOddsFromDetailSoup, reverseGameNumbers
+    getLastPageNum, parseGameRows, getDateHeaderRow, isRegularSeason,
+    countGameDataRows, extractGameRowAndTeamNames, RowOddsResult,
+    extractOddsAndWinnerFromRow, findDetailPageLink,
+    extractOddsFromDetailHtml, reverseGameNumbers
 )
 
 
@@ -271,8 +271,7 @@ class OddsPortalScraper:
         self.waitForStableElementCount(".eventRow", stable_checks=6, poll_interval=1.5, timeout=30)
 
         html = self.driver.page_source
-        soup = BeautifulSoup(html, "lxml")
-        gameRows = soup.find_all(class_="eventRow")
+        gameRows = parseGameRows(html)
 
         non_header_rows, rows_with_game_data = countGameDataRows(gameRows)
 
@@ -321,12 +320,11 @@ class OddsPortalScraper:
             print(f"  💾 Using cached HTML for page {page_num}")
             with open(cache_path, "r", encoding="utf-8") as f:
                 html = f.read()
-            soup = BeautifulSoup(html, "lxml")
-            gameRows = soup.find_all(class_="eventRow")
+            gameRows = parseGameRows(html)
             succeeded = True
         else:
             # Starts empty rather than None: if every attempt fails before ever
-            # reaching soup.find_all() below (e.g. the pagination-link wait times
+            # reaching parseGameRows() below (e.g. the pagination-link wait times
             # out on every retry), there's no "last attempt's content" to fall
             # back to. Treating that as zero rows lets the caller's consecutive-
             # failure circuit breaker do its job instead of crashing here on a
@@ -369,19 +367,10 @@ class OddsPortalScraper:
 
     # Scrape a single game (both home & away) from a table row and add to games dictionary.
     def scrapeGamesFromRow(self, row, seasonStartYear: int, games: Dict[str, List[Game]]):
-        gameRow = row.select_one('[data-testid="game-row"]')
-
-        if not gameRow:
-            print("  ⚠️  No game-row found in row, skipping")
+        team_info = extractGameRowAndTeamNames(row)
+        if team_info is None:
             return
-
-        teams = gameRow.select('p.participant-name')
-        if len(teams) < 2:
-            print(f"  ⚠️  Not enough team names found (found {len(teams)}), skipping game")
-            return
-
-        homeTeamName = teams[0].text.strip()
-        awayTeamName = teams[1].text.strip()
+        gameRow, homeTeamName, awayTeamName = team_info
 
         extraction = extractOddsAndWinnerFromRow(gameRow)
 
@@ -456,7 +445,7 @@ class OddsPortalScraper:
         """
         Fallback for when odds aren't shown on the main results page:
         navigates to the individual game's detail page to get them, then
-        hands the resulting HTML to parser.extractOddsFromDetailSoup to
+        hands the resulting HTML to parser.extractOddsFromDetailHtml to
         determine the winner and odds.
 
         Args:
@@ -482,8 +471,7 @@ class OddsPortalScraper:
             print("  ⚠️  Timeout waiting for odds on detail page")
             return False, False, -1, -1
 
-        detail_soup = BeautifulSoup(self.driver.page_source, "lxml")
-        return extractOddsFromDetailSoup(detail_soup, row)
+        return extractOddsFromDetailHtml(self.driver.page_source, row)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     #   SECTION 4: SEASON-LEVEL ORCHESTRATION          #
@@ -511,8 +499,7 @@ class OddsPortalScraper:
     def getSeasonScheduleLinks(self, seasonStartYear: int) -> List[str]:
         buildUrl = self._resolveSeasonUrlBuilder(seasonStartYear)
         self.waitForElement('.pagination-link[data-number]')
-        soup = BeautifulSoup(self.driver.page_source, "lxml")
-        lastPageNum = getLastPageNum(soup)
+        lastPageNum = getLastPageNum(self.driver.page_source)
         return [buildUrl(pageNum) for pageNum in range(1, lastPageNum + 1)]
 
     # Scrapes all games for a season (with OddsPortal-specific handling).
