@@ -49,8 +49,11 @@ public/
     events/                   # Submit/interaction orchestration
     view/                     # Result rendering
 
-scrape/
-  main.py                     # End-to-end scrape and migrate flow
+data/
+  main.py                     # End-to-end scrape, validate, and migrate flow
+  scrape/                     # OddsPortal moneyline scraping
+  storage/                    # SQLite save/verify, schedule validation, Postgres migration
+  util/                       # Shared data model, constants, output, frontend update
   YEARLY_WORKFLOW.md          # Operational yearly procedure
 ```
 
@@ -97,14 +100,14 @@ npm run sync-env
 
 ## Data Pipeline
 
-The `scrape/` directory contains the yearly ingestion flow:
+The `data/` directory contains the yearly ingestion flow:
 
 1. Scrape seasons from OddsPortal
 2. Verify expected game counts
 3. Migrate records into PostgreSQL
 4. Update frontend season options
 
-See `scrape/README.md` and `scrape/YEARLY_WORKFLOW.md` for full operational details.
+See `data/README.md` and `data/YEARLY_WORKFLOW.md` for full operational details.
 
 ## Testing and Validation
 

@@ -14,7 +14,7 @@ from typing import Dict, Tuple
 
 def get_postgres_connection():
     """Get connection to Vercel Postgres database."""
-    # From scrape/util/postgres_db.py, go up 2 levels to project root
+    # From data/storage/postgres_db.py, go up 2 levels to project root
     env_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         '.env.development.local'

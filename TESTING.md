@@ -44,7 +44,7 @@ python3 query_db.py
 ### Test 1: Virtual Environment
 
 ```bash
-cd scrape
+cd data
 source .venv/bin/activate
 python3 --version
 pip list
@@ -55,9 +55,9 @@ pip list
 ### Test 2: Import Test (No Scraping)
 
 ```bash
-cd scrape
+cd data
 source .venv/bin/activate
-python3 -c "from oddsportal.oddsportal_scraper import OddsPortalScraper; print('✅ Imports work')"
+python3 -c "from scrape.odds.oddsportal_scraper import OddsPortalScraper; print('✅ Imports work')"
 ```
 
 **Expected:** "✅ Imports work" prints
@@ -65,9 +65,9 @@ python3 -c "from oddsportal.oddsportal_scraper import OddsPortalScraper; print('
 ### Test 3: Database Connection Test
 
 ```bash
-cd scrape
+cd data
 source .venv/bin/activate
-python3 -c "from utils.postgres_utils import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
+python3 -c "from storage.postgres_db import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
 ```
 
 **Expected:** "✅ DB connected" prints
@@ -75,7 +75,7 @@ python3 -c "from utils.postgres_utils import get_postgres_connection; conn = get
 ### Test 4: Dry Run Help
 
 ```bash
-cd scrape
+cd data
 source .venv/bin/activate
 python3 main.py --help
 ```

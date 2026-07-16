@@ -7,7 +7,7 @@ Python scripts for scraping NBA moneyline data from OddsPortal.
 ### First Time Setup
 
 ```bash
-cd scrape
+cd data
 
 # Create virtual environment
 python3 -m venv .venv
@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 ```bash
 # Navigate to scrape folder
-cd scrape
+cd data
 
 # Activate virtual environment
 source .venv/bin/activate
@@ -46,7 +46,7 @@ See [YEARLY_WORKFLOW.md](YEARLY_WORKFLOW.md) for detailed annual update process.
 ## Adding Python Packages
 
 ```bash
-cd scrape
+cd data
 source .venv/bin/activate
 pip install new-package
 pip freeze > requirements.txt

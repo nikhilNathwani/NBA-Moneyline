@@ -12,10 +12,10 @@ __pycache__/
 *.so
 
 # Temporary SQLite databases
-scrape/*.db
+data/*.db
 
 # Cached basketball-reference schedule pages (schedule validation)
-scrape/.bbref_cache/
+data/.bbref_cache/
 
 # pytest
 .pytest_cache/

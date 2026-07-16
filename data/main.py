@@ -38,22 +38,19 @@ def check_requirements():
 
 check_requirements()
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from scrape.odds.oddsportal_scraper import OddsPortalScraper
-from scrape.util.sqlite_db import save_to_database, verify_scraped_data
-from scrape.util.postgres_db import (
+from storage.sqlite_db import save_to_database, verify_scraped_data
+from storage.postgres_db import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
-from scrape.util.schedule_validation import validate_scraped_data_against_schedule
-from scrape.util.console_output import (
+from storage.schedule_validation import validate_scraped_data_against_schedule
+from util.console_output import (
     print_verification_results,
     print_schedule_validation_results,
     print_postgres_verification
 )
-from scrape.util.update_frontend import (
+from util.update_frontend import (
     update_seasons_list,
     commit_and_push_changes
 )
@@ -61,7 +58,7 @@ from scrape.util.update_frontend import (
 
 # Define output paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRAPE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def parse_seasons(seasons_arg: List[str]) -> List[int]:
@@ -118,7 +115,7 @@ def main():
     # Process each season
     for season in seasons:
         db_filename = f"moneyline_{season%100:02d}.db"
-        db_path = os.path.join(SCRAPE_DIR, db_filename)
+        db_path = os.path.join(DATA_DIR, db_filename)
         
         # Step 1: Scrape data
         if not args.skip_scrape:
@@ -157,7 +154,7 @@ def main():
             print(f"STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
             print(f"{'='*70}")
 
-            cache_dir = os.path.join(SCRAPE_DIR, '.bbref_cache', str(season))
+            cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
             schedule_comparisons = validate_scraped_data_against_schedule(db_path, season, cache_dir=cache_dir)
             print_schedule_validation_results(season, schedule_comparisons)
 

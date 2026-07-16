@@ -1,5 +1,5 @@
 """
-Tests for the pure URL-construction/matching helpers in odds.helpers.
+Tests for the pure URL-construction/matching helpers in scrape.odds.helpers.
 
 OddsPortal only archives a season under its own URL once a newer season has
 started; the most recently completed season is only reachable via the
@@ -9,7 +9,7 @@ oddsportal_scraper.py) instead of hardcoding an assumption that breaks the
 moment a new season begins.
 """
 
-from odds.helpers import makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason
+from scrape.odds.helpers import makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason
 
 
 def test_season_specific_url_contains_season_and_page():
