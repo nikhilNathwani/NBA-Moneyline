@@ -6,7 +6,7 @@ When a new NBA season ends and you want to add that year's data to your app.
 
 ```bash
 cd data
-python3 main.py --seasons 2025
+python3 main.py --season 2025
 ```
 
 Replace `2025` with the season start year (e.g., for 2025-26 season, use 2025).
@@ -106,14 +106,12 @@ Displays all seasons in your database:
 
 ```bash
 # Run in headless mode (no browser window)
-python3 main.py --seasons 2025 --headless
-
-# Scrape multiple seasons at once
-python3 main.py --seasons 2024 2025
-
-# Scrape a range of seasons
-python3 main.py --seasons 2020-2024
+python3 main.py --season 2025 --headless
 ```
+
+Catching up multiple seasons after a gap means running this multiple times
+(one invocation per season), not passing several seasons to one run - see
+the note at the top of `main.py` for why.
 
 ## After Migration
 

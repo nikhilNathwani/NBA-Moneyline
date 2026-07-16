@@ -37,31 +37,24 @@ def read_seasons_list() -> List[str]:
     return seasons
 
 
-def update_seasons_list(new_seasons: List[int]) -> bool:
+def update_seasons_list(new_season: int) -> bool:
     """
-    Update the seasons list in renderFilters.js with new seasons.
-    
+    Update the seasons list in renderFilters.js with the new season.
+
     Args:
-        new_seasons: List of season start years (e.g., [2024])
-        
+        new_season: Season start year (e.g. 2024)
+
     Returns:
-        True if seasons were added, False if no changes needed
+        True if the season was added, False if it was already present
     """
     file_path = get_render_filters_path()
     current_seasons = read_seasons_list()
-    
-    # Convert new seasons to the format "YYYY-YY"
-    formatted_new_seasons = []
-    for year in new_seasons:
-        season_str = f"{year}-{(year + 1) % 100:02d}"
-        if season_str not in current_seasons:
-            formatted_new_seasons.append(season_str)
-    
-    if not formatted_new_seasons:
-        return False  # No new seasons to add
-    
-    # Add new seasons to the list and sort
-    all_seasons = sorted(current_seasons + formatted_new_seasons)
+
+    season_str = f"{new_season}-{(new_season + 1) % 100:02d}"
+    if season_str in current_seasons:
+        return False  # Already present, no change needed
+
+    all_seasons = sorted(current_seasons + [season_str])
     
     # Read the file
     with open(file_path, 'r') as f:
@@ -84,13 +77,13 @@ def update_seasons_list(new_seasons: List[int]) -> bool:
     return True
 
 
-def commit_and_push_changes(seasons: List[int]) -> bool:
+def commit_and_push_changes(season: int) -> bool:
     """
     Commit and push the updated renderFilters.js to git.
-    
+
     Args:
-        seasons: List of season start years that were added
-        
+        season: Season start year that was added
+
     Returns:
         True if successful, False otherwise
     """
@@ -119,11 +112,8 @@ def commit_and_push_changes(seasons: List[int]) -> bool:
             return True
         
         # Create commit message
-        season_strs = [f"{year}-{(year + 1) % 100:02d}" for year in seasons]
-        if len(season_strs) == 1:
-            commit_msg = f"Add {season_strs[0]} season to web app"
-        else:
-            commit_msg = f"Add {', '.join(season_strs)} seasons to web app"
+        season_str = f"{season}-{(season + 1) % 100:02d}"
+        commit_msg = f"Add {season_str} season to web app"
         
         # Commit
         subprocess.run(

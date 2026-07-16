@@ -3,17 +3,22 @@
 NBA Moneyline Data Pipeline - Main Script
 
 This script orchestrates the complete workflow:
-1. Scrape NBA moneyline data from OddsPortal for specified season(s)
+1. Scrape NBA moneyline data from OddsPortal for the specified season
 2. Verify the scraped data (game counts per team)
 3. Prompt user to confirm migration
 4. Migrate data to Vercel Postgres database
 5. Update frontend seasons list and push to git
 6. Verify migration was successful
 
+One season per run, by design - catching up multiple seasons after a gap
+just means running this multiple times. OddsPortal is already slow and
+rate-limit-prone for a single season; depending on it for several in one
+run isn't worth it, and running seasons as separate invocations means a
+failure on one never risks work already completed on another.
+
 Usage:
-    python3 main.py --seasons 2024
-    python3 main.py --seasons 2023 2024
-    python3 main.py --seasons 2024 --headless
+    python3 main.py --season 2024
+    python3 main.py --season 2024 --headless
 """
 
 import os
@@ -21,7 +26,6 @@ import sys
 import shutil
 import subprocess
 import argparse
-from typing import List
 
 # Check and install requirements if needed
 def check_requirements():
@@ -61,18 +65,6 @@ from util.console_output import (
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def parse_seasons(seasons_arg: List[str]) -> List[int]:
-    """Parse season arguments into list of season start years."""
-    seasons = []
-    for arg in seasons_arg:
-        if '-' in arg:
-            start, end = arg.split('-')
-            seasons.extend(range(int(start), int(end) + 1))
-        else:
-            seasons.append(int(arg))
-    return sorted(list(set(seasons)))
-
-
 def main():
     parser = argparse.ArgumentParser(
         description='Complete NBA Moneyline data pipeline: scrape, verify, and migrate',
@@ -80,10 +72,10 @@ def main():
         epilog=__doc__
     )
     parser.add_argument(
-        '--seasons',
-        nargs='+',
+        '--season',
+        type=int,
         required=True,
-        help='Season start years to scrape (e.g., 2024 or 2023 2024)'
+        help='Season start year to scrape (e.g., 2024 for the 2024-25 season)'
     )
     parser.add_argument(
         '--headless',
@@ -97,38 +89,35 @@ def main():
     )
 
     args = parser.parse_args()
-    seasons = parse_seasons(args.seasons)
+    season = args.season
 
     print(f"\n{'='*70}")
     print(f"🏀 NBA MONEYLINE DATA PIPELINE")
     print(f"{'='*70}")
-    print(f"Seasons: {', '.join(f'{s}-{(s+1)%100:02d}' for s in seasons)}\n")
+    print(f"Season: {season}-{(season+1)%100:02d}\n")
 
-    # Track successfully migrated seasons for frontend update
-    migrated_seasons = []
+    # Cache dirs computed unconditionally (regardless of --skip-schedule-validation
+    # or where a failure happens) so cleanup after a successful migration can
+    # always find them, whether or not they ended up being used this run.
+    odds_cache_dir = os.path.join(DATA_DIR, '.oddsportal_cache', str(season))
+    bbref_cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
 
-    # Process each season
-    for season in seasons:
-        # Cache dirs computed unconditionally (regardless of --skip-schedule-validation
-        # or where a failure happens) so cleanup after a successful migration can
-        # always find them, whether or not they ended up being used this run.
-        odds_cache_dir = os.path.join(DATA_DIR, '.oddsportal_cache', str(season))
-        bbref_cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
+    season_migrated = False
+    season_games = None
 
-        # Step 1: Scrape data
-        print(f"\n{'='*70}")
-        print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
-        print(f"{'='*70}\n")
+    # Step 1: Scrape data
+    print(f"\n{'='*70}")
+    print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
+    print(f"{'='*70}\n")
 
-        scraper = OddsPortalScraper(headless=args.headless)
-        try:
-            season_games = scraper.scrapeSeasonSchedule(season, cache_dir=odds_cache_dir)
-        except RuntimeError as e:
-            print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
-            print(f"⏭️  Skipping this season and moving on (pages that rendered "
-                  f"successfully before the abort are cached for the next run).")
-            continue
+    scraper = OddsPortalScraper(headless=args.headless)
+    try:
+        season_games = scraper.scrapeSeasonSchedule(season, cache_dir=odds_cache_dir)
+    except RuntimeError as e:
+        print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
+        print(f"⏭️  Pages that rendered successfully before the abort are cached for the next run.")
 
+    if season_games is not None:
         # Step 2: Verify scraped data
         print(f"\n{'='*70}")
         print(f"STEP 2: VERIFYING SCRAPED DATA")
@@ -166,9 +155,7 @@ def main():
             try:
                 inserted = migrate_season_to_postgres(season_games, season)
                 print(f"\n✅ Migration complete: {inserted} games inserted")
-
-                # Track this season for frontend update
-                migrated_seasons.append(season)
+                season_migrated = True
 
                 # Data is safely in production now - the local scrape caches
                 # (kept until now purely so a failure could resume cheaply)
@@ -179,29 +166,25 @@ def main():
                 print(f"🧹 Cleaned up local scrape caches for {season}-{(season+1)%100:02d}")
             except Exception as e:
                 print(f"\n❌ Migration failed: {e}")
-                continue
         else:
             print(f"\n⏭️  Skipping migration for {season}-{(season+1)%100:02d}")
-            continue
 
-    # Step 4: Update frontend with new seasons
-    if migrated_seasons:
+    # Step 4: Update frontend with the new season
+    if season_migrated:
         print(f"\n{'='*70}")
         print(f"STEP 4: UPDATING FRONTEND SEASONS LIST")
         print(f"{'='*70}\n")
 
-        seasons_added = update_seasons_list(migrated_seasons)
+        if update_seasons_list(season):
+            season_str = f"{season}-{(season+1)%100:02d}"
+            print(f"📝 Added {season_str} to frontend seasons list")
 
-        if seasons_added:
-            season_strs = ', '.join(f"{s}-{(s+1)%100:02d}" for s in migrated_seasons)
-            print(f"📝 Added {season_strs} to frontend seasons list")
-
-            if commit_and_push_changes(migrated_seasons):
+            if commit_and_push_changes(season):
                 print(f"✅ Changes committed and pushed to git")
             else:
                 print(f"⚠️  Git operation failed (changes may need manual commit)")
         else:
-            print(f"ℹ️  Seasons already exist in frontend, no update needed")
+            print(f"ℹ️  Season already exists in frontend, no update needed")
 
     # Step 5: Final verification
     print(f"\n{'='*70}")
