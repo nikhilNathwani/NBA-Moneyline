@@ -1,5 +1,5 @@
 from typing import List, Dict
-from util.scraping.game import Game
+from util.game import Game
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
