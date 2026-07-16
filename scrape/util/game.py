@@ -46,15 +46,3 @@ class Game:
                 f"Outcome: {'W' if self.outcome else 'L'}, "
                 f"WinOdds: {self.winOdds}, LoseOdds: {self.loseOdds}, "
                 f"GameNumber: {self.gameNumber}")
-    
-    def to_dict(self):
-        """Convert game to dictionary for JSON serialization."""
-        return {
-            "team": self.team,
-            "seasonStartYear": self.seasonStartYear,
-            "gameNumber": self.gameNumber,
-            "outcome": self.outcome,
-            "winOdds": self.winOdds,
-            "loseOdds": self.loseOdds,
-            "opponent": self.opponent
-        }
