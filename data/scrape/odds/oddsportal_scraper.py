@@ -4,32 +4,50 @@ OddsPortal scraper for NBA moneyline data.
 Scrapes game results and moneyline odds from OddsPortal.com for NBA regular seasons.
 OddsPortal provides average moneyline odds across many bookmakers.
 
-Created in November 2024. If OddsPortal changes their website structure, 
+Created in November 2024. If OddsPortal changes their website structure,
 this scraper may need updates.
+
+Combines Selenium browser automation and OddsPortal-specific scraping logic
+in one class. These used to be split across a base class (generic Selenium
+mechanics) and a subclass (OddsPortal specifics), on the theory that the
+base class could be reused for a future second dynamic-site scraper - but
+no second one ever showed up, and OddsPortal-specific knowledge (the Vue
+router reload workaround, the OneTrust cookie-consent selector) had already
+leaked into the "generic" class anyway. One class is more honest about what
+this actually is.
 """
 
 import os
+import time
 from typing import List, Dict, Optional
+
 from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 from util.game import Game
-from scrape.odds.selenium_webdriver import SeleniumWebDriver
 from scrape.odds.helpers import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
     getLastPageNum, getDateHeaderRow, isRegularSeason, scrapeGamesFromRow, reverseGameNumbers
 )
 
 
-class OddsPortalScraper(SeleniumWebDriver):
+class OddsPortalScraper:
     """
     Scraper for OddsPortal NBA moneyline data.
-    
-    Scrapes historical NBA game results with moneyline odds from oddsportal.com.
-    Inherits WebDriver automation from SeleniumWebDriver for dynamic page handling.
+
+    Scrapes historical NBA game results with moneyline odds from oddsportal.com,
+    including the Selenium browser automation needed to handle its dynamic,
+    JS-rendered pages.
     """
-    
-    # Initialize the OddsPortal scraper.
+
     def __init__(self, headless: bool = False):
-        SeleniumWebDriver.__init__(self, headless)
+        self.headless = headless
+        self.wait_time = 10
+        self.driver = None
         # Carries over across page boundaries: a date's games can legitimately
         # span two pages, and the date header only appears once (on whichever
         # page that date started on), so this must not reset per-page.
@@ -38,7 +56,181 @@ class OddsPortalScraper(SeleniumWebDriver):
         # so far this season, used to detect pages that rendered a stale/
         # partial loading skeleton instead of the full row set.
         self._max_nonheader_rows_seen = 0
-    
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    #          BROWSER AUTOMATION MECHANICS          #
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+    def initDriver(self):
+        """Initialize Selenium WebDriver with optimized settings."""
+        if self.driver is not None:
+            return self.driver
+
+        options = Options()
+        if self.headless:
+            options.add_argument("--headless=new")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+
+        # Disable images, stylesheets, and fonts for faster loading
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.managed_default_content_settings.stylesheets": 2,
+            "profile.managed_default_content_settings.fonts": 2,
+        }
+        options.add_experimental_option("prefs", prefs)
+
+        self.driver = webdriver.Chrome(options=options)
+
+        # --- IMPORTANT: Disable browser cache so single-page-apps (SPAs) fully reload ---
+        self.driver.execute_cdp_cmd("Network.enable", {})
+        self.driver.execute_cdp_cmd("Network.setCacheDisabled", {"cacheDisabled": True})
+
+        return self.driver
+
+    def quitDriver(self):
+        """Close the WebDriver if it's open."""
+        if self.driver is not None:
+            self.driver.quit()
+            self.driver = None
+
+    def loadWebPage(self, url: str):
+        """
+        Load a web page using the WebDriver.
+
+        Args:
+            url (str): URL of the page to load
+        """
+        if self.driver is None:
+            self.initDriver()
+
+        self.driver.get(url)
+
+        # --- IMPORTANT: Force a TRUE network reload to defeat OddsPortal's Vue router caching ---
+        self.driver.execute_script("location.reload(true);")
+
+        time.sleep(4)
+
+        # A cookie-consent modal (OneTrust) can cover the whole page and block
+        # the underlying results content from ever rendering, which would
+        # otherwise silently time out every wait downstream with no clear
+        # cause. It only needs dismissing once per browser session, but
+        # forcing a true reload on every page load risks it resurfacing, so
+        # check (cheaply) on every load rather than assuming once is enough.
+        self.dismissCookieConsentIfPresent()
+
+        # Scroll to load all lazy-loaded content
+        self.scrollToBottom()
+
+    def dismissCookieConsentIfPresent(self):
+        """
+        Click through OddsPortal's OneTrust cookie-consent banner if it's
+        covering the page. An instant (non-waiting) check: by the time this
+        is called we've already slept after navigation, so the banner - if
+        it's going to appear at all - is already in the DOM. Not waiting
+        here avoids adding dead latency to every page load in the common
+        case where the banner was already dismissed earlier in this browser
+        session.
+        """
+        try:
+            buttons = self.driver.find_elements(By.ID, "onetrust-reject-all-handler")
+            if buttons:
+                buttons[0].click()
+                time.sleep(1)  # let the modal finish closing before we scroll/parse
+        except Exception:
+            pass  # not present this load - already dismissed, or this page doesn't show it
+
+    def scrollToBottom(self):
+        """
+        Scroll to bottom of page to trigger lazy loading.
+
+        Scrolls in increments to ensure lazy-loaded content is triggered.
+        """
+        if self.driver is None:
+            raise RuntimeError("Driver not initialized. Call initDriver() first.")
+
+        # Get initial page height
+        last_height = self.driver.execute_script("return document.body.scrollHeight")
+
+        # Scroll in smaller increments to trigger lazy loading
+        current_position = 0
+        scroll_increment = 200  # pixels to scroll at a time
+
+        while current_position < last_height:
+            # Scroll down by increment
+            current_position += scroll_increment
+            self.driver.execute_script(f"window.scrollTo(0, {current_position});")
+            time.sleep(1.5)  # Wait for content to load
+
+            # Check if page height increased (new content loaded)
+            new_height = self.driver.execute_script("return document.body.scrollHeight")
+            if new_height > last_height:
+                last_height = new_height
+
+        # Final scroll to absolute bottom
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(2)
+
+    def waitForElement(self, css_selector: str):
+        """
+        Wait for an element to be present on the page.
+
+        Args:
+            css_selector (str): CSS selector of the element to wait for
+        """
+        if self.driver is None:
+            raise RuntimeError("Driver not initialized. Call initDriver() first.")
+
+        WebDriverWait(self.driver, self.wait_time).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, css_selector))
+        )
+        time.sleep(2)  # Additional wait to ensure content is fully loaded
+
+    def waitForStableElementCount(self, css_selector: str, min_count: int = 1,
+                                   stable_checks: int = 3, poll_interval: float = 1.0,
+                                   timeout: float = 20.0):
+        """
+        Wait until the number of elements matching css_selector stops changing.
+
+        Guards against scraping a page mid-transition: on a slow render, the
+        pagination-active-link/button can appear before the game rows have
+        finished swapping in (or while stale rows from the previous page are
+        still being removed), which causes games to be missed or duplicated
+        across the page boundary. Polling the row count until it's stable
+        confirms the DOM has actually settled before we parse it.
+
+        Args:
+            css_selector: CSS selector of the repeating elements to count (e.g. eventRow)
+            min_count: minimum element count required before considering it stable
+            stable_checks: number of consecutive matching counts required
+            poll_interval: seconds between polls
+            timeout: max seconds to wait before giving up and proceeding anyway
+        """
+        if self.driver is None:
+            raise RuntimeError("Driver not initialized. Call initDriver() first.")
+
+        start = time.time()
+        last_count = -1
+        consecutive_matches = 0
+
+        while time.time() - start < timeout:
+            count = len(self.driver.find_elements(By.CSS_SELECTOR, css_selector))
+            if count >= min_count and count == last_count:
+                consecutive_matches += 1
+                if consecutive_matches >= stable_checks:
+                    return count
+            else:
+                consecutive_matches = 0
+            last_count = count
+            time.sleep(poll_interval)
+
+        print(f"  ⚠️  Element count for '{css_selector}' never stabilized within {timeout}s (last count: {last_count})")
+        return last_count
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+    #           ODDSPORTAL-SPECIFIC SCRAPING          #
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
     # Determines whether the requested season is already archived under its own
     # OddsPortal URL, or is still only reachable via the generic "current
     # results" page (true for whichever season was most recently completed,
@@ -61,10 +253,10 @@ class OddsPortalScraper(SeleniumWebDriver):
     def getSeasonScheduleLinks(self, seasonStartYear: int) -> List[str]:
         buildUrl = self._resolveSeasonUrlBuilder(seasonStartYear)
         self.waitForElement('.pagination-link[data-number]')
-        soup = self.makeSoup()
+        soup = BeautifulSoup(self.driver.page_source, "lxml")
         lastPageNum = getLastPageNum(soup)
         return [buildUrl(pageNum) for pageNum in range(1, lastPageNum + 1)]
-    
+
     # Scrapes all games from a single OddsPortal results page.
     # Returns True if the page rendered successfully within max_attempts (or
     # was already cached from a prior successful run), False if we had to
@@ -171,7 +363,7 @@ class OddsPortalScraper(SeleniumWebDriver):
                 scrapeGamesFromRow(gameRow, seasonStartYear, games, self.driver)
 
         return succeeded
-    
+
     # Scrapes all games for a season (with OddsPortal-specific handling).
     # cache_dir: if given, each page's rendered HTML is cached there once it
     # passes scrapeGamesFromPage's sanity checks, so a re-run after a
@@ -219,14 +411,14 @@ class OddsPortalScraper(SeleniumWebDriver):
                         )
         finally:
             self.quitDriver()
-        
+
         print(f"\n{'='*60}")
         print(f"Total games scraped: {total_games_scraped}")
         print(f"Total game objects (2 per game): {sum(len(team_games) for team_games in games.values())}")
         print(f"Expected: 2460 games = 4920 game objects")
         print(f"{'='*60}\n")
-        
+
         # Fix game numbers (OddsPortal lists games in reverse chronological order)
         reverseGameNumbers(games)
-        
+
         return games
