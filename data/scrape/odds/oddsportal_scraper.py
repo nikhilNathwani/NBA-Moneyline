@@ -7,32 +7,22 @@ OddsPortal provides average moneyline odds across many bookmakers.
 Created in November 2024. If OddsPortal changes their website structure,
 this scraper may need updates.
 
-Combines Selenium browser automation and OddsPortal-specific scraping logic
-in one class. These used to be split across a base class (generic Selenium
-mechanics) and a subclass (OddsPortal specifics), on the theory that the
-base class could be reused for a future second dynamic-site scraper - but
-no second one ever showed up, and OddsPortal-specific knowledge (the Vue
-router reload workaround, the OneTrust cookie-consent selector) had already
-leaked into the "generic" class anyway. One class is more honest about what
-this actually is.
+Owns everything that needs a live Selenium session: browser mechanics,
+the resilient page-fetch (retry/sanity-check/cache), the missing-odds
+live re-fetch, and season/pagination orchestration. Delegates everything
+parseable-in-hand (URL construction, HTML/row/soup interpretation) to
+parser.py.
 
-A three-way fetcher/parser/orchestrator file split (mirroring schedules/)
-was considered and rejected: unlike schedules/fetcher.py, judging whether
-an OddsPortal page fetch actually succeeded requires inspecting parsed
-content (the sanity checks below), so "fetching" and "enough parsing to
-judge quality" aren't independent concerns here the way they are for a
-plain HTTP GET. Splitting across files would mean threading self.driver
-and self._max_nonheader_rows_seen across module boundaries for a benefit
-that's mostly aesthetic. Instead, this class is organized into four
-sections matching its real seams: session/automation primitives,
-resilient page-fetch, row-level data extraction, and season orchestration.
-
-A standalone parser.py used to hold the pure helpers below too, but that
-implied "this is where OddsPortal parsing lives" when most of the real
-parsing (row/odds/winner extraction) is on the class itself, and nothing
-outside this file and its tests ever imported it. Kept here instead as a
-labeled preamble - same pure/stateless/no-driver property, same easy
-testability, just without the misleading separate-file framing.
+That split - not a three-way fetcher/parser/orchestrator file split, and
+not one single file - is deliberate. Judging whether an OddsPortal page
+fetch actually succeeded requires inspecting parsed content (the sanity
+checks in _attemptPageFetch), so a standalone "fetcher" would still need
+to call back into parser.py to judge its own success; separating fetch
+from orchestration into two classes would only add composition plumbing
+(delegating driver access across an object boundary) without removing
+that dependency. Keeping everything that touches self.driver together
+here, while parser.py owns everything that doesn't, is the boundary that
+actually matches where the real coupling is and isn't.
 """
 
 import os
@@ -47,64 +37,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from util.game import Game
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-#   PURE HELPERS (URL construction + HTML         #
-#   parsing, no live driver needed)               #
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-# OddsPortal only gives a season its own archived results URL once a newer
-# season has started; the most recently completed season is only reachable
-# via the generic (season-agnostic) "current results" URL until then. Both
-# URLs are needed - see _resolveSeasonUrlBuilder below, which live-checks
-# which one applies for the requested season rather than hardcoding an
-# assumption that breaks as soon as a new season starts.
-
-# Construct the archived, season-specific results URL for a given season and page number.
-def makeSeasonSpecificUrl(seasonStartYear: int, pageNum: int) -> str:
-    return f"https://www.oddsportal.com/basketball/usa/nba-{seasonStartYear}-{seasonStartYear+1}/results/#/page/{pageNum}/"
-
-# Construct the generic "current results" URL (whatever season OddsPortal currently considers current).
-def makeCurrentSeasonUrl(pageNum: int) -> str:
-    return f"https://www.oddsportal.com/basketball/usa/nba/results/#/page/{pageNum}/"
-
-# Check whether a (possibly redirected-to) URL still refers to the requested season's archive,
-# i.e. whether OddsPortal accepted the season-specific URL instead of redirecting away from it.
-def urlMatchesRequestedSeason(url: str, seasonStartYear: int) -> bool:
-    return f"nba-{seasonStartYear}-{seasonStartYear+1}" in url
-
-# Get the last page number for pagination.
-def getLastPageNum(soup) -> int:
-    pagination_links = soup.select('.pagination-link[data-number]')
-    if pagination_links:
-        last_link = pagination_links[-1]
-        last_page_num = int(last_link.get('data-number'))
-        return last_page_num
-    else:
-        print(f"No pagination links found, defaulting to 1 page")
-        return 1
-
-# Get the date header row for a game row (if present).
-def getDateHeaderRow(gameRow):
-    headerRow = gameRow.select_one('[data-testid="date-header"]')
-    return headerRow
-
-# Determine if games under this header are regular season games.
-def isRegularSeason(header) -> bool:
-    text = header.get_text(strip=True)
-    #date header has "[date] - [gameType]" for non-reg season games
-    return "-" not in text
-
-# Fix game numbers to be in chronological order.
-# (OddsPortal lists games in reverse chronological order, so I reverse & renumber them)
-def reverseGameNumbers(games: Dict[str, List[Game]]):
-    for team, team_games in games.items():
-        # Reverse the list so it's in chronological order
-        team_games.reverse()
-        # Assign game numbers
-        for i, game in enumerate(team_games, start=1):
-            game.gameNumber = i
+from scrape.odds.parser import (
+    makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
+    getLastPageNum, getDateHeaderRow, isRegularSeason, countGameDataRows,
+    RowOddsResult, extractOddsAndWinnerFromRow, findDetailPageLink,
+    extractOddsFromDetailSoup, reverseGameNumbers
+)
 
 
 class OddsPortalScraper:
@@ -336,9 +274,7 @@ class OddsPortalScraper:
         soup = BeautifulSoup(html, "lxml")
         gameRows = soup.find_all(class_="eventRow")
 
-        header_count = sum(1 for r in gameRows if getDateHeaderRow(r) is not None)
-        non_header_rows = len(gameRows) - header_count
-        rows_with_game_data = sum(1 for r in gameRows if r.select_one('[data-testid="game-row"]') is not None)
+        non_header_rows, rows_with_game_data = countGameDataRows(gameRows)
 
         # Sanity check 1: on a fully-rendered page, almost every non-header
         # eventRow should be a parseable game row (the only legitimate
@@ -447,10 +383,30 @@ class OddsPortalScraper:
         homeTeamName = teams[0].text.strip()
         awayTeamName = teams[1].text.strip()
 
-        odds_and_winner = self._extractOddsAndWinner(gameRow, row, homeTeamName, awayTeamName)
-        if odds_and_winner is None:
+        extraction = extractOddsAndWinnerFromRow(gameRow)
+
+        if extraction.result == RowOddsResult.PARSE_ERROR:
+            print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (error parsing odds: {extraction.error})")
             return
-        homeWon, awayWon, homeWinOdds, awayWinOdds = odds_and_winner
+
+        if extraction.result == RowOddsResult.NEEDS_FALLBACK:
+            print(f"  ⚠️  Missing odds for {homeTeamName} vs {awayTeamName}, using fallback...")
+
+            # Save the HTML for debugging
+            debug_dir = "/tmp/moneyline_debug"
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_file = os.path.join(debug_dir, f"{homeTeamName}_vs_{awayTeamName}.html")
+            with open(debug_file, 'w') as f:
+                f.write(str(row.prettify()))
+            print(f"  → Saved HTML to {debug_file}")
+
+            homeWon, awayWon, homeWinOdds, awayWinOdds = self._fetchOddsFromDetailPage(row)
+
+            if homeWinOdds == -1 or awayWinOdds == -1:
+                print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (fallback failed)")
+                return
+        else:
+            homeWon, awayWon, homeWinOdds, awayWinOdds = extraction.odds
 
         # Guard against re-scraping the same game twice.
         # This happens when a page transition races ahead of the DOM swap (the
@@ -496,54 +452,12 @@ class OddsPortalScraper:
                 games[game.team] = []
             games[game.team].append(game)
 
-    # Determines the winner and moneyline odds for a game row: uses the
-    # odds already present in the row if OddsPortal rendered them there,
-    # falling back to a live fetch of the game's own detail page if not.
-    def _extractOddsAndWinner(self, gameRow, row, homeTeamName: str, awayTeamName: str):
-        """
-        Returns:
-            Optional[tuple]: (homeWon, awayWon, homeWinOdds, awayWinOdds),
-            or None if odds couldn't be determined at all (caller should
-            skip this game).
-        """
-        odds_elements = gameRow.select('p[data-testid^="odd-container"]')
-
-        if odds_elements is None or len(odds_elements) < 2:
-            # Fallback for missing odds
-            print(f"  ⚠️  Missing odds for {homeTeamName} vs {awayTeamName}, using fallback...")
-
-            # Save the HTML for debugging
-            debug_dir = "/tmp/moneyline_debug"
-            os.makedirs(debug_dir, exist_ok=True)
-            debug_file = os.path.join(debug_dir, f"{homeTeamName}_vs_{awayTeamName}.html")
-            with open(debug_file, 'w') as f:
-                f.write(str(row.prettify()))
-            print(f"  → Saved HTML to {debug_file}")
-
-            homeWon, awayWon, homeWinOdds, awayWinOdds = self._fetchOddsFromDetailPage(row)
-
-            if homeWinOdds == -1 or awayWinOdds == -1:
-                print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (fallback failed)")
-                return None
-
-            return homeWon, awayWon, homeWinOdds, awayWinOdds
-
-        homeWon = "winning" in odds_elements[0].get("data-testid", "")
-        awayWon = "winning" in odds_elements[1].get("data-testid", "")
-        try:
-            homeWinOdds = int(odds_elements[0].text.strip())
-            awayWinOdds = int(odds_elements[1].text.strip())
-        except (ValueError, AttributeError) as e:
-            print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (error parsing odds: {e})")
-            return None
-
-        return homeWon, awayWon, homeWinOdds, awayWinOdds
-
     def _fetchOddsFromDetailPage(self, row):
         """
         Fallback for when odds aren't shown on the main results page:
-        navigates to the individual game's detail page to get them, and
-        determines the winner from the original row HTML.
+        navigates to the individual game's detail page to get them, then
+        hands the resulting HTML to parser.extractOddsFromDetailSoup to
+        determine the winner and odds.
 
         Args:
             row: BeautifulSoup element of the game row
@@ -551,16 +465,13 @@ class OddsPortalScraper:
         Returns:
             tuple: (homeWon, awayWon, homeWinOdds, awayWinOdds)
         """
-        # Find the game detail page link
-        game_row_div = row.select_one('[data-testid="game-row"]')
-        first_link = game_row_div.find('a', href=True)
-
-        if not first_link:
+        href = findDetailPageLink(row)
+        if href is None:
             print("  ⚠️  No link found in game row, returning defaults")
             return False, False, -1, -1
 
         # Navigate to the game detail page
-        game_url = "https://www.oddsportal.com" + first_link['href']
+        game_url = "https://www.oddsportal.com" + href
         print(f"  → Fetching odds from detail page: {game_url}")
         self.driver.get(game_url)
 
@@ -571,45 +482,8 @@ class OddsPortalScraper:
             print("  ⚠️  Timeout waiting for odds on detail page")
             return False, False, -1, -1
 
-        # Get the odds from the detail page
         detail_soup = BeautifulSoup(self.driver.page_source, "lxml")
-        odds_elements = detail_soup.select('[data-testid="odd-container"]')
-
-        if len(odds_elements) < 2:
-            print("  ⚠️  Not enough odds elements found on detail page")
-            return False, False, -1, -1
-
-        try:
-            homeWinOdds = int(odds_elements[0].text.strip())
-            awayWinOdds = int(odds_elements[1].text.strip())
-        except (ValueError, AttributeError) as e:
-            print(f"  ⚠️  Error parsing odds: {e}")
-            return False, False, -1, -1
-
-        # Determine winner from original row
-        # Find the participant-name elements
-        participant_names = row.select('p.participant-name')
-
-        if len(participant_names) < 2:
-            print("  ⚠️  Not enough participant names found")
-            return False, False, homeWinOdds, awayWinOdds
-
-        # Check if the first participant's parent div has 'font-bold' class
-        # indicating they won
-        first_participant_parent = participant_names[0].parent
-
-        # The parent div structure might vary, so check the immediate parent
-        # and its classes
-        if first_participant_parent and 'font-bold' in first_participant_parent.get('class', []):
-            homeWon = True
-            awayWon = False
-        else:
-            homeWon = False
-            awayWon = True
-
-        print(f"  ✓ Odds retrieved: Home={homeWinOdds}, Away={awayWinOdds}, HomeWon={homeWon}")
-
-        return homeWon, awayWon, homeWinOdds, awayWinOdds
+        return extractOddsFromDetailSoup(detail_soup, row)
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     #   SECTION 4: SEASON-LEVEL ORCHESTRATION          #
