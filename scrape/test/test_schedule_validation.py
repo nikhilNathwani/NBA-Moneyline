@@ -1,11 +1,11 @@
 """
-Tests for the pure comparison logic in utils.schedule_validation.
+Tests for the pure comparison logic in util.schedule_validation.
 
 These use synthetic opponent lists (no network, no fixtures) since
 compare_opponent_multisets is a pure function.
 """
 
-from utils.schedule_validation import compare_opponent_multisets
+from util.schedule_validation import compare_opponent_multisets
 
 
 def test_identical_sequences_match():

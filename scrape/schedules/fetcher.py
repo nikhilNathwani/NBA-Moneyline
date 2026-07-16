@@ -1,7 +1,7 @@
 """
 Fetches raw season-schedule HTML from basketball-reference.com.
 
-Kept separate from schedule_parser.py so the parsing logic can be unit
+Kept separate from parser.py so the parsing logic can be unit
 tested against saved HTML fixtures with no network access, and so this
 module's caching/politeness behavior can be changed without touching
 parsing logic at all.

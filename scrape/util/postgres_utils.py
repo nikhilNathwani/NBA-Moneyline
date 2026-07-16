@@ -11,7 +11,7 @@ from collections import Counter
 from dotenv import load_dotenv
 from typing import Dict, Tuple
 
-from utils.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
+from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
 
 
 def get_postgres_connection():

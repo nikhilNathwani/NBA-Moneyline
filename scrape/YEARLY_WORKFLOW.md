@@ -23,7 +23,7 @@ Replace `2025` with the season start year (e.g., for 2025-26 season, use 2025).
 ### Step 2: Verification
 
 Displays comprehensive stats and an explicit pass/fail against the expected
-game-count distribution (see `utils/constants.py`):
+game-count distribution (see `util/constants.py`):
 
 ```
 ✅ Total Games Scraped: 2448 (expected 2448)
@@ -131,7 +131,7 @@ python3 main.py --seasons 2025 --skip-scrape
 ### Total doesn't match the expected count, or the distribution check fails
 
 -   Check if regular season is actually complete
--   Re-run Step 2.5 (or `pytest scrape/tests/`) - the schedule validation step will name
+-   Re-run Step 2.5 (or `pytest scrape/test/`) - the schedule validation step will name
     the specific team(s)/opponent(s) that are off, which is much faster to debug than
     staring at raw counts
 -   Some end-of-season games may not have odds on OddsPortal
@@ -210,7 +210,7 @@ POSTGRES_URL=postgres://username:password@host/database
 -   **Backups**: SQLite files serve as temporary storage; Postgres is the source of truth
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
--   **Tests**: `pytest scrape/tests/` runs the parsing/comparison logic against saved
+-   **Tests**: `pytest scrape/test/` runs the parsing/comparison logic against saved
     fixtures with no network access - worth running after any scraper changes
 
 ## Need Help?

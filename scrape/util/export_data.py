@@ -8,7 +8,7 @@ import json
 import sqlite3
 import os
 from typing import Dict, List
-from utils.game import Game
+from util.scraping.game import Game
 
 
 def save_to_json(all_games: Dict[int, Dict[str, List[Game]]], output_path: str):
