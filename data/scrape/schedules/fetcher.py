@@ -9,12 +9,14 @@ parsing logic at all.
 
 import os
 import time
+import urllib.error
 import urllib.request
 
 from scrape.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
 REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits
+MAX_FETCH_ATTEMPTS = 3
 
 
 def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None) -> str:
@@ -38,8 +40,20 @@ def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None
 
     url = f"https://www.basketball-reference.com/teams/{abbr}/{season_end_year}_games.html"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=20) as response:
-        html = response.read().decode("utf-8")
+
+    html = None
+    for attempt in range(1, MAX_FETCH_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                html = response.read().decode("utf-8")
+            break
+        except (urllib.error.URLError, TimeoutError) as e:
+            print(f"  ⚠️  Attempt {attempt}/{MAX_FETCH_ATTEMPTS} failed to fetch {abbr}'s schedule "
+                  f"({e.__class__.__name__}: {e}), retrying...")
+            if attempt < MAX_FETCH_ATTEMPTS:
+                time.sleep(REQUEST_DELAY_SECONDS)
+    else:
+        raise RuntimeError(f"Failed to fetch {abbr}'s schedule after {MAX_FETCH_ATTEMPTS} attempts")
 
     if cache_path:
         with open(cache_path, "w", encoding="utf-8") as f:

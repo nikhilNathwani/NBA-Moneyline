@@ -8,7 +8,9 @@ Created in November 2024. If OddsPortal changes their website structure,
 this scraper may need updates.
 """
 
-from typing import List, Dict
+import os
+from typing import List, Dict, Optional
+from bs4 import BeautifulSoup
 from util.game import Game
 from scrape.odds.selenium_webdriver import SeleniumWebDriver
 from scrape.odds.helpers import (
@@ -64,76 +66,102 @@ class OddsPortalScraper(SeleniumWebDriver):
         return [buildUrl(pageNum) for pageNum in range(1, lastPageNum + 1)]
     
     # Scrapes all games from a single OddsPortal results page.
-    # Returns True if the page rendered successfully within max_attempts,
-    # False if we had to give up and proceed with the last (possibly
-    # incomplete) attempt's content - the caller uses this to detect a
-    # site-wide outage/block rather than silently completing with bad data.
+    # Returns True if the page rendered successfully within max_attempts (or
+    # was already cached from a prior successful run), False if we had to
+    # give up and proceed with the last (possibly incomplete) attempt's
+    # content - the caller uses this to detect a site-wide outage/block
+    # rather than silently completing with bad data.
     def scrapeGamesFromPage(self, url: str, page_num: int, seasonStartYear: int, games: Dict[str, List[Game]],
-                             max_attempts: int = 5) -> bool:
-        # Starts empty rather than None: if every attempt fails before ever
-        # reaching soup.find_all() below (e.g. the pagination-link wait times
-        # out on every retry), there's no "last attempt's content" to fall
-        # back to. Treating that as zero rows lets the caller's consecutive-
-        # failure circuit breaker do its job instead of crashing here on a
-        # NoneType iteration error that would mask the real signal.
-        gameRows = []
-        succeeded = False
-        for attempt in range(1, max_attempts + 1):
-            try:
-                # Launch oddsportal webpage
-                self.loadWebPage(url)
+                             max_attempts: int = 5, cache_dir: Optional[str] = None) -> bool:
+        # Cache is keyed by page number, mirroring schedules/fetcher.py's
+        # per-team cache: lets a re-run (e.g. after OddsPortal rate-limits
+        # mid-scrape) skip straight past every page that already rendered
+        # successfully, instead of re-scraping the whole season from page 1.
+        cache_path = os.path.join(cache_dir, f"page_{page_num}.html") if cache_dir else None
 
-                # Wait for the active pagination link to confirm page load
-                self.waitForElement(f"a.pagination-link.active[data-number='{page_num}']")
-
-                # Wait for "Add to My Leagues" button to confirm game table is loaded
-                self.waitForElement('[data-testid="add-to-my-leagues-button"]')
-
-                # Wait for the event row count to stop changing before parsing, so we
-                # don't scrape mid-transition (causes missed or duplicated boundary games).
-                # A loading skeleton can render a handful of eventRow-classed
-                # placeholders that sit unchanged for a few seconds while the
-                # real data streams in behind it, so require a long, patient
-                # stable window rather than a quick one.
-                self.waitForStableElementCount(".eventRow", stable_checks=6, poll_interval=1.5, timeout=30)
-
-                soup = self.makeSoup()
-                gameRows = soup.find_all(class_="eventRow")
-
-                header_count = sum(1 for r in gameRows if getDateHeaderRow(r) is not None)
-                non_header_rows = len(gameRows) - header_count
-                rows_with_game_data = sum(1 for r in gameRows if r.select_one('[data-testid="game-row"]') is not None)
-
-                # Sanity check 1: on a fully-rendered page, almost every non-header
-                # eventRow should be a parseable game row (the only legitimate
-                # exclusions are rare odds-missing fallback failures). If most
-                # non-header rows have no `game-row` testid at all, the DOM
-                # likely stalled mid-render (stale/partial content).
-                if non_header_rows > 0 and rows_with_game_data / non_header_rows < 0.8:
-                    raise RuntimeError(
-                        f"Page {page_num} looks incompletely rendered: only "
-                        f"{rows_with_game_data}/{non_header_rows} non-header rows had game data"
-                    )
-
-                # Sanity check 2: compare against the largest row count seen on
-                # a good page so far this season. A page with far fewer rows
-                # than the established norm is likely a stale loading skeleton
-                # that happened to be internally consistent (so check 1 alone
-                # wouldn't catch it), not a genuinely quiet day.
-                if self._max_nonheader_rows_seen >= 20 and non_header_rows < 0.5 * self._max_nonheader_rows_seen:
-                    raise RuntimeError(
-                        f"Page {page_num} has only {non_header_rows} non-header rows, "
-                        f"vs. {self._max_nonheader_rows_seen} seen on a prior page this season"
-                    )
-
-                self._max_nonheader_rows_seen = max(self._max_nonheader_rows_seen, non_header_rows)
-                succeeded = True
-                break
-            except Exception as e:
-                print(f"  ⚠️  Attempt {attempt}/{max_attempts} failed to load page {page_num} ({e.__class__.__name__}: {e}), retrying...")
+        if cache_path and os.path.exists(cache_path):
+            print(f"  💾 Using cached HTML for page {page_num}")
+            with open(cache_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            soup = BeautifulSoup(html, "lxml")
+            gameRows = soup.find_all(class_="eventRow")
+            succeeded = True
         else:
-            print(f"  ❌ Page {page_num} still looked incomplete after {max_attempts} attempts — "
-                  f"proceeding with the last attempt's content. Verify this page's counts manually.")
+            # Starts empty rather than None: if every attempt fails before ever
+            # reaching soup.find_all() below (e.g. the pagination-link wait times
+            # out on every retry), there's no "last attempt's content" to fall
+            # back to. Treating that as zero rows lets the caller's consecutive-
+            # failure circuit breaker do its job instead of crashing here on a
+            # NoneType iteration error that would mask the real signal.
+            gameRows = []
+            succeeded = False
+            html = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    # Launch oddsportal webpage
+                    self.loadWebPage(url)
+
+                    # Wait for the active pagination link to confirm page load
+                    self.waitForElement(f"a.pagination-link.active[data-number='{page_num}']")
+
+                    # Wait for "Add to My Leagues" button to confirm game table is loaded
+                    self.waitForElement('[data-testid="add-to-my-leagues-button"]')
+
+                    # Wait for the event row count to stop changing before parsing, so we
+                    # don't scrape mid-transition (causes missed or duplicated boundary games).
+                    # A loading skeleton can render a handful of eventRow-classed
+                    # placeholders that sit unchanged for a few seconds while the
+                    # real data streams in behind it, so require a long, patient
+                    # stable window rather than a quick one.
+                    self.waitForStableElementCount(".eventRow", stable_checks=6, poll_interval=1.5, timeout=30)
+
+                    html = self.driver.page_source
+                    soup = BeautifulSoup(html, "lxml")
+                    gameRows = soup.find_all(class_="eventRow")
+
+                    header_count = sum(1 for r in gameRows if getDateHeaderRow(r) is not None)
+                    non_header_rows = len(gameRows) - header_count
+                    rows_with_game_data = sum(1 for r in gameRows if r.select_one('[data-testid="game-row"]') is not None)
+
+                    # Sanity check 1: on a fully-rendered page, almost every non-header
+                    # eventRow should be a parseable game row (the only legitimate
+                    # exclusions are rare odds-missing fallback failures). If most
+                    # non-header rows have no `game-row` testid at all, the DOM
+                    # likely stalled mid-render (stale/partial content).
+                    if non_header_rows > 0 and rows_with_game_data / non_header_rows < 0.8:
+                        raise RuntimeError(
+                            f"Page {page_num} looks incompletely rendered: only "
+                            f"{rows_with_game_data}/{non_header_rows} non-header rows had game data"
+                        )
+
+                    # Sanity check 2: compare against the largest row count seen on
+                    # a good page so far this season. A page with far fewer rows
+                    # than the established norm is likely a stale loading skeleton
+                    # that happened to be internally consistent (so check 1 alone
+                    # wouldn't catch it), not a genuinely quiet day.
+                    if self._max_nonheader_rows_seen >= 20 and non_header_rows < 0.5 * self._max_nonheader_rows_seen:
+                        raise RuntimeError(
+                            f"Page {page_num} has only {non_header_rows} non-header rows, "
+                            f"vs. {self._max_nonheader_rows_seen} seen on a prior page this season"
+                        )
+
+                    self._max_nonheader_rows_seen = max(self._max_nonheader_rows_seen, non_header_rows)
+                    succeeded = True
+                    break
+                except Exception as e:
+                    print(f"  ⚠️  Attempt {attempt}/{max_attempts} failed to load page {page_num} ({e.__class__.__name__}: {e}), retrying...")
+            else:
+                print(f"  ❌ Page {page_num} still looked incomplete after {max_attempts} attempts — "
+                      f"proceeding with the last attempt's content. Verify this page's counts manually.")
+
+            # Only cache pages that actually passed the sanity checks above -
+            # a flaky/incomplete render must never be "locked in" as if it
+            # were good, or a re-run would silently keep reusing bad data
+            # instead of retrying it live.
+            if succeeded and cache_path:
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    f.write(html)
 
         for gameRow in gameRows:
             dateHeaderRow= getDateHeaderRow(gameRow)
@@ -145,7 +173,11 @@ class OddsPortalScraper(SeleniumWebDriver):
         return succeeded
     
     # Scrapes all games for a season (with OddsPortal-specific handling).
-    def scrapeSeasonSchedule(self, seasonStartYear: int) -> Dict[str, List[Game]]:
+    # cache_dir: if given, each page's rendered HTML is cached there once it
+    # passes scrapeGamesFromPage's sanity checks, so a re-run after a
+    # mid-scrape failure (e.g. OddsPortal rate-limiting) can resume from
+    # where it left off instead of re-scraping every page from scratch.
+    def scrapeSeasonSchedule(self, seasonStartYear: int, cache_dir: Optional[str] = None) -> Dict[str, List[Game]]:
         games = {}
         urls = self.getSeasonScheduleLinks(seasonStartYear)
 
@@ -159,7 +191,7 @@ class OddsPortalScraper(SeleniumWebDriver):
             for i, url in enumerate(urls, start=1):
                 print(f"Scraping page {i}/{len(urls)}...")
                 games_before = sum(len(team_games) for team_games in games.values())
-                page_succeeded = self.scrapeGamesFromPage(url, i, seasonStartYear, games)
+                page_succeeded = self.scrapeGamesFromPage(url, i, seasonStartYear, games, cache_dir=cache_dir)
                 games_after = sum(len(team_games) for team_games in games.values())
                 games_on_page = games_after - games_before
                 total_games_scraped += games_on_page

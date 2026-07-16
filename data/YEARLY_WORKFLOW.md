@@ -138,6 +138,10 @@ python3 main.py --seasons 2020-2024
     than silently producing an incomplete dataset
 -   Wait a while (the exact cooldown isn't known - at least tens of minutes) before
     re-running; re-running immediately is unlikely to help and may extend the block
+-   Re-running isn't a full do-over: every page that rendered successfully before
+    the abort is cached (`data/.oddsportal_cache/`), so the retry picks up from
+    where it left off instead of re-scraping from page 1. The cache is cleared
+    automatically once that season's migration succeeds
 -   If it keeps happening after a real wait, check manually in a real (non-headless)
     browser whether OddsPortal's site structure changed
 
@@ -204,9 +208,14 @@ POSTGRES_URL=postgres://username:password@host/database
 -   **In-Season Tournament**: Knockout-round (quarterfinal/semifinal) games are excluded;
     which teams/counts that affects is detected automatically each season (not hardcoded
     to a specific bracket), so this should keep working even if the bracket size changes
--   **No intermediate storage**: scraped data lives in memory for the duration of a
-    run and is never persisted locally; Postgres is the only source of truth. A
-    failed migration means re-running the whole pipeline (which is safe - see below)
+-   **No intermediate data storage**: scraped data itself lives in memory for the
+    duration of a run and is never persisted locally; Postgres is the only source
+    of truth, and a failed migration means re-running the whole pipeline (which is
+    safe - see below). The pipeline does cache raw page HTML during scraping
+    (`data/.oddsportal_cache/`, `data/.bbref_cache/`) purely so a re-run after a
+    mid-scrape failure is cheap - neither verification nor migration ever reads
+    from these caches, and both are deleted automatically once a season migrates
+    successfully
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
 -   **Tests**: `pytest data/test/` runs the parsing/comparison logic against saved

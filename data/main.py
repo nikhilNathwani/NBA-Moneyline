@@ -18,6 +18,7 @@ Usage:
 
 import os
 import sys
+import shutil
 import subprocess
 import argparse
 from typing import List
@@ -55,7 +56,8 @@ from util.console_output import (
 )
 
 
-# Directory this script lives in, used for the basketball-reference schedule cache
+# Directory this script lives in, used for the OddsPortal page cache and the
+# basketball-reference schedule cache
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -107,6 +109,12 @@ def main():
 
     # Process each season
     for season in seasons:
+        # Cache dirs computed unconditionally (regardless of --skip-schedule-validation
+        # or where a failure happens) so cleanup after a successful migration can
+        # always find them, whether or not they ended up being used this run.
+        odds_cache_dir = os.path.join(DATA_DIR, '.oddsportal_cache', str(season))
+        bbref_cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
+
         # Step 1: Scrape data
         print(f"\n{'='*70}")
         print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
@@ -114,10 +122,11 @@ def main():
 
         scraper = OddsPortalScraper(headless=args.headless)
         try:
-            season_games = scraper.scrapeSeasonSchedule(season)
+            season_games = scraper.scrapeSeasonSchedule(season, cache_dir=odds_cache_dir)
         except RuntimeError as e:
             print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
-            print(f"⏭️  Skipping this season and moving on (no data was saved for it).")
+            print(f"⏭️  Skipping this season and moving on (pages that rendered "
+                  f"successfully before the abort are cached for the next run).")
             continue
 
         # Step 2: Verify scraped data
@@ -134,9 +143,15 @@ def main():
             print(f"STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
             print(f"{'='*70}")
 
-            cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
-            schedule_comparisons = validate_scraped_data_against_schedule(season_games, season, cache_dir=cache_dir)
-            print_schedule_validation_results(season, schedule_comparisons)
+            try:
+                schedule_comparisons = validate_scraped_data_against_schedule(
+                    season_games, season, cache_dir=bbref_cache_dir)
+                print_schedule_validation_results(season, schedule_comparisons)
+            except Exception as e:
+                print(f"\n⚠️  Schedule validation failed ({e.__class__.__name__}: {e}) - "
+                      f"skipping this check rather than losing the completed scrape over it.")
+                print(f"⚠️  Proceeding to migration without schedule validation for "
+                      f"{season}-{(season+1)%100:02d}. Consider re-running Step 2.5 manually later.")
 
         # Step 3: Prompt for migration
         print(f"{'='*70}")
@@ -154,6 +169,14 @@ def main():
 
                 # Track this season for frontend update
                 migrated_seasons.append(season)
+
+                # Data is safely in production now - the local scrape caches
+                # (kept until now purely so a failure could resume cheaply)
+                # are no longer needed.
+                for cache_dir in (odds_cache_dir, bbref_cache_dir):
+                    if os.path.isdir(cache_dir):
+                        shutil.rmtree(cache_dir)
+                print(f"🧹 Cleaned up local scrape caches for {season}-{(season+1)%100:02d}")
             except Exception as e:
                 print(f"\n❌ Migration failed: {e}")
                 continue
