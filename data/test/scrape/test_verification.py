@@ -1,11 +1,11 @@
 """
-Tests for the pure comparison logic in migrate.verification.
+Tests for the pure comparison logic in scrape.verification.
 
 These use synthetic opponent lists (no network, no fixtures) since
 compare_opponent_multisets is a pure function.
 """
 
-from migrate.verification import compare_opponent_multisets
+from scrape.verification import compare_opponent_multisets
 
 
 def test_identical_sequences_match():

@@ -2,8 +2,8 @@
 Saves scraped game data to the local staging database (SQLite) - the
 direct output of the scrape (Step 1). Deleted once migration to the
 production database succeeds. For verifying this data before migration,
-see migrate/verification.py. For the production side, see
-migrate/production_db.py.
+see scrape/verification.py. For the production side, see
+publish/migrate_to_production.py.
 """
 
 import sqlite3

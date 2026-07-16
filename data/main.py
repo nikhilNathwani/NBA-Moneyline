@@ -40,19 +40,19 @@ check_requirements()
 
 from scrape.oddsportal_scraper import OddsPortalScraper
 from scrape.save_scraped_data import save_to_database
-from migrate.production_db import (
+from scrape.verification import verify_scraped_data, validate_scraped_data_against_schedule
+from publish.migrate_to_production import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
-from migrate.verification import verify_scraped_data, validate_scraped_data_against_schedule
+from publish.update_frontend import (
+    update_seasons_list,
+    commit_and_push_changes
+)
 from util.console_output import (
     print_verification_results,
     print_schedule_validation_results,
     print_postgres_verification
-)
-from util.update_frontend import (
-    update_seasons_list,
-    commit_and_push_changes
 )
 
 

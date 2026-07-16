@@ -5,7 +5,7 @@ Console output formatting utilities for the NBA Moneyline data pipeline.
 from typing import Dict, List
 
 from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
-from migrate.verification import TeamScheduleComparison
+from scrape.verification import TeamScheduleComparison
 
 
 def print_verification_results(season: int, results: Dict):

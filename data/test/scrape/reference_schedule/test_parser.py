@@ -1,5 +1,5 @@
 """
-Tests for migrate.reference_schedule.parser using saved HTML fixtures
+Tests for scrape.reference_schedule.parser using saved HTML fixtures
 (no network access) covering the three cases that matter for our IST/play-in
 exclusion logic: an unaffected team, an IST quarterfinal-round loser, an IST
 semifinalist, and a team that also played in the play-in tournament.
@@ -7,7 +7,7 @@ semifinalist, and a team that also played in the play-in tournament.
 
 import os
 
-from migrate.reference_schedule.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from scrape.reference_schedule.parser import parseScheduleTable, getTrueRegularSeasonOpponents
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
