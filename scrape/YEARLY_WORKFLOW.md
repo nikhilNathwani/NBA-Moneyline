@@ -22,21 +22,44 @@ Replace `2025` with the season start year (e.g., for 2025-26 season, use 2025).
 
 ### Step 2: Verification
 
-Displays comprehensive stats for you to review:
+Displays comprehensive stats and an explicit pass/fail against the expected
+game-count distribution (see `utils/constants.py`):
 
 ```
-📊 Total Games Scraped: 2460
+✅ Total Games Scraped: 2448 (expected 2448)
 
 📋 Games Per Team:
   Atlanta Hawks................................. 82 games
-  Boston Celtics................................ 82 games
+  New York Knicks............................... 80 games
   [... all 30 teams ...]
+
+✅ Per-team distribution matches expectations: 22 teams @ 82, 4 teams @ 81, 4 teams @ 80
 ```
 
 **What to check:**
 
--   Total should be ~2,460 games (30 teams × 82 games)
--   Each team should have exactly 82 games
+-   Total should be 2,448 games (30 teams × 82, minus 12 excluded in-season-tournament
+    knockout games: the 4 IST semifinalists each play 2 knockout games and land on 80,
+    the 4 teams eliminated in the IST quarterfinal each play 1 and land on 81, the
+    remaining 22 teams are unaffected at 82). If a season doesn't have an in-season
+    tournament, expect all 30 teams at 82 (2,460 total) instead.
+-   The pass/fail line should say ✅. If it doesn't, the printed mismatches tell you
+    which teams/counts are off - don't proceed to migration until this is resolved.
+
+### Step 2.5: Schedule Validation
+
+Cross-checks every team's scraped opponents against basketball-reference.com's
+authoritative schedule (order-agnostic, so a legitimate game postponement/reschedule
+won't false-positive):
+
+```
+✅ All 30 teams' scraped opponents match the authoritative schedule
+```
+
+If a team shows a mismatch, it lists the specific missing/extra opponents so you can
+investigate that team's data directly rather than re-scraping blind. Skip this step
+with `--skip-schedule-validation` if you don't have network access to
+basketball-reference.com or want a faster run.
 
 ### Step 3: Confirmation
 
@@ -75,9 +98,10 @@ Displays all seasons in your database:
   2016-17:......................................... 2460 games
   2017-18:......................................... 2460 games
   ...
-  2025-26:......................................... 2460 games ✨ NEW
+  2024-25:......................................... 2448 games
+  2025-26:......................................... 2448 games ✨ NEW
   ─────────────────────────────────────────────────────────
-  TOTAL:........................................... 24600 games
+  TOTAL:........................................... 23922 games
 ```
 
 ## Options
@@ -104,11 +128,23 @@ python3 main.py --seasons 2025 --skip-scrape
 
 ## Troubleshooting
 
-### Fewer than 2,460 games scraped
+### Total doesn't match the expected count, or the distribution check fails
 
 -   Check if regular season is actually complete
--   In-season tournament quarterfinals/semifinals are excluded (expected)
+-   Re-run Step 2.5 (or `pytest scrape/tests/`) - the schedule validation step will name
+    the specific team(s)/opponent(s) that are off, which is much faster to debug than
+    staring at raw counts
 -   Some end-of-season games may not have odds on OddsPortal
+
+### "N consecutive pages failed to render" / scrape aborted mid-run
+
+-   This means OddsPortal is very likely rate-limiting or temporarily blocking automated
+    requests (not a one-off timing glitch) - the scraper deliberately gives up rather
+    than silently producing an incomplete dataset
+-   Wait a while (the exact cooldown isn't known - at least tens of minutes) before
+    re-running; re-running immediately is unlikely to help and may extend the block
+-   If it keeps happening after a real wait, check manually in a real (non-headless)
+    browser whether OddsPortal's site structure changed
 
 ### Invalid odds warnings
 
@@ -127,6 +163,11 @@ python3 main.py --seasons 2025 --skip-scrape
 -   Make sure Chrome/Chromium is installed
 -   Try without `--headless` flag to see what's happening
 -   Check if OddsPortal changed their site structure (may need code updates)
+-   The scraper auto-detects whether the requested season is archived under its own
+    OddsPortal URL yet, or still only reachable via the generic current-results page
+    (this is expected/normal for whichever season was most recently completed) - if
+    you see "isn't archived under its own OddsPortal URL yet", that's informational,
+    not an error
 
 ## Prerequisites (One-time Setup)
 
@@ -163,10 +204,14 @@ POSTGRES_URL=postgres://username:password@host/database
 ## Notes
 
 -   **Timing**: Wait until regular season is completely finished
--   **In-Season Tournament**: Quarterfinal/semifinal games are excluded (this is noted in the app)
+-   **In-Season Tournament**: Knockout-round (quarterfinal/semifinal) games are excluded;
+    which teams/counts that affects is detected automatically each season (not hardcoded
+    to a specific bracket), so this should keep working even if the bracket size changes
 -   **Backups**: SQLite files serve as temporary storage; Postgres is the source of truth
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
+-   **Tests**: `pytest scrape/tests/` runs the parsing/comparison logic against saved
+    fixtures with no network access - worth running after any scraper changes
 
 ## Need Help?
 

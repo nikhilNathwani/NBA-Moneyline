@@ -69,22 +69,47 @@ class SeleniumWebDriver:
     def loadWebPage(self, url: str):
         """
         Load a web page using the WebDriver.
-        
+
         Args:
             url (str): URL of the page to load
         """
         if self.driver is None:
             self.initDriver()
-            
+
         self.driver.get(url)
 
         # --- IMPORTANT: Force a TRUE network reload to defeat Vue router caching ---
         self.driver.execute_script("location.reload(true);")
-        
+
         time.sleep(4)
 
+        # A cookie-consent modal (OneTrust) can cover the whole page and block
+        # the underlying results content from ever rendering, which would
+        # otherwise silently time out every wait downstream with no clear
+        # cause. It only needs dismissing once per browser session, but
+        # forcing a true reload on every page load risks it resurfacing, so
+        # check (cheaply) on every load rather than assuming once is enough.
+        self.dismissCookieConsentIfPresent()
+
         # Scroll to load all lazy-loaded content
-        self.scrollToBottom()   
+        self.scrollToBottom()
+
+    def dismissCookieConsentIfPresent(self):
+        """
+        Click through the OneTrust cookie-consent banner if it's covering the
+        page. An instant (non-waiting) check: by the time this is called
+        we've already slept after navigation, so the banner - if it's going
+        to appear at all - is already in the DOM. Not waiting here avoids
+        adding dead latency to every page load in the common case where the
+        banner was already dismissed earlier in this browser session.
+        """
+        try:
+            buttons = self.driver.find_elements(By.ID, "onetrust-reject-all-handler")
+            if buttons:
+                buttons[0].click()
+                time.sleep(1)  # let the modal finish closing before we scroll/parse
+        except Exception:
+            pass  # not present this load - already dismissed, or this page doesn't show it
 
 
     def makeSoup(self) -> BeautifulSoup:

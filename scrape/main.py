@@ -128,8 +128,13 @@ def main():
             print(f"{'='*70}\n")
             
             scraper = OddsPortalScraper(headless=args.headless)
-            season_games = scraper.scrapeSeasonSchedule(season)
-            
+            try:
+                season_games = scraper.scrapeSeasonSchedule(season)
+            except RuntimeError as e:
+                print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
+                print(f"⏭️  Skipping this season and moving on (no data was saved for it).")
+                continue
+
             # Save to database
             save_to_database({season: season_games}, db_path)
             print(f"\n✅ Saved data to: {db_path}")

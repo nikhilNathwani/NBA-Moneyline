@@ -17,6 +17,9 @@ scrape/*.db
 # Cached basketball-reference schedule pages (schedule validation)
 scrape/.bbref_cache/
 
+# pytest
+.pytest_cache/
+
 # Sample SQL queries for database inspection
 app/queries/sampleQueries.sql
 
