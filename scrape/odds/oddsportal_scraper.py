@@ -9,9 +9,9 @@ this scraper may need updates.
 """
 
 from typing import List, Dict
-from core.game import Game
-from core.selenium_webdriver import SeleniumWebDriver
-from oddsportal.helpers import (
+from utils.game import Game
+from utils.selenium_webdriver import SeleniumWebDriver
+from odds.helpers import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
     getLastPageNum, getDateHeaderRow, isRegularSeason, scrapeGamesFromRow, reverseGameNumbers
 )
@@ -70,7 +70,13 @@ class OddsPortalScraper(SeleniumWebDriver):
     # site-wide outage/block rather than silently completing with bad data.
     def scrapeGamesFromPage(self, url: str, page_num: int, seasonStartYear: int, games: Dict[str, List[Game]],
                              max_attempts: int = 5) -> bool:
-        gameRows = None
+        # Starts empty rather than None: if every attempt fails before ever
+        # reaching soup.find_all() below (e.g. the pagination-link wait times
+        # out on every retry), there's no "last attempt's content" to fall
+        # back to. Treating that as zero rows lets the caller's consecutive-
+        # failure circuit breaker do its job instead of crashing here on a
+        # NoneType iteration error that would mask the real signal.
+        gameRows = []
         succeeded = False
         for attempt in range(1, max_attempts + 1):
             try:

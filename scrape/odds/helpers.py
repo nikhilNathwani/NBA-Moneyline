@@ -1,5 +1,5 @@
 from typing import List, Dict
-from core.game import Game
+from utils.game import Game
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

@@ -41,7 +41,7 @@ check_requirements()
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scrape.oddsportal.oddsportal_scraper import OddsPortalScraper
+from scrape.odds.oddsportal_scraper import OddsPortalScraper
 from scrape.utils.export_data import save_to_database
 from scrape.utils.postgres_utils import (
     verify_scraped_data,

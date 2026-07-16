@@ -14,8 +14,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from basketball_reference.schedule_fetcher import fetchAllTeamSchedules
-from basketball_reference.schedule_parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from schedules.schedule_fetcher import fetchAllTeamSchedules
+from schedules.schedule_parser import parseScheduleTable, getTrueRegularSeasonOpponents
 
 
 @dataclass
