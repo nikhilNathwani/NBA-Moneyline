@@ -51,8 +51,8 @@ public/
 
 data/
   main.py                     # End-to-end scrape, validate, and migrate flow
-  scrape/                     # OddsPortal moneyline scraping
-  storage/                    # Staging save/verify, schedule comparison, production migration
+  scrape/                     # OddsPortal moneyline scraping + staging DB output
+  migrate/                    # Verify scraped data, then migrate to production
   util/                       # Shared data model, constants, output, frontend update
   YEARLY_WORKFLOW.md          # Operational yearly procedure
 ```
