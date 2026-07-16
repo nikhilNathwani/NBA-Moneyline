@@ -29,9 +29,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from util.game import Game
-from scrape.odds.helpers import (
+from scrape.odds.parser import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
-    getLastPageNum, getDateHeaderRow, isRegularSeason, scrapeGamesFromRow, reverseGameNumbers
+    getLastPageNum, getDateHeaderRow, isRegularSeason, reverseGameNumbers
 )
 
 
@@ -360,9 +360,173 @@ class OddsPortalScraper:
             if dateHeaderRow is not None:
                 self._isRegularSeasonNow = isRegularSeason(dateHeaderRow)
             if self._isRegularSeasonNow:
-                scrapeGamesFromRow(gameRow, seasonStartYear, games, self.driver)
+                self.scrapeGamesFromRow(gameRow, seasonStartYear, games)
 
         return succeeded
+
+    # Scrape a single game (both home & away) from a table row and add to games dictionary.
+    def scrapeGamesFromRow(self, row, seasonStartYear: int, games: Dict[str, List[Game]]):
+        gameRow = row.select_one('[data-testid="game-row"]')
+
+        if not gameRow:
+            print("  ⚠️  No game-row found in row, skipping")
+            return
+
+        # Extract odds elements and team names
+        odds_elements = gameRow.select('p[data-testid^="odd-container"]')
+        teams = gameRow.select('p.participant-name')
+
+        if len(teams) < 2:
+            print(f"  ⚠️  Not enough team names found (found {len(teams)}), skipping game")
+            return
+
+        homeTeamName = teams[0].text.strip()
+        awayTeamName = teams[1].text.strip()
+
+        # Parse outcomes and odds
+        if odds_elements is None or len(odds_elements) < 2:
+            # Fallback for missing odds
+            print(f"  ⚠️  Missing odds for {homeTeamName} vs {awayTeamName}, using fallback...")
+
+            # Save the HTML for debugging
+            debug_dir = "/tmp/moneyline_debug"
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_file = os.path.join(debug_dir, f"{homeTeamName}_vs_{awayTeamName}.html")
+            with open(debug_file, 'w') as f:
+                f.write(str(row.prettify()))
+            print(f"  → Saved HTML to {debug_file}")
+
+            homeWon, awayWon, homeWinOdds, awayWinOdds = self._fetchOddsFromDetailPage(row)
+
+            # Check if fallback failed
+            if homeWinOdds == -1 or awayWinOdds == -1:
+                print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (fallback failed)")
+                return
+        else:
+            homeWon = "winning" in odds_elements[0].get("data-testid", "")
+            awayWon = "winning" in odds_elements[1].get("data-testid", "")
+            try:
+                homeWinOdds = int(odds_elements[0].text.strip())
+                awayWinOdds = int(odds_elements[1].text.strip())
+            except (ValueError, AttributeError) as e:
+                print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (error parsing odds: {e})")
+                return
+
+        # Guard against re-scraping the same game twice.
+        # This happens when a page transition races ahead of the DOM swap (the
+        # last game row of the previous page is still present when the next
+        # page is scraped) or when a page renders a "featured game" widget that
+        # duplicates a row already present elsewhere in the same page's list.
+        # Both failure modes only ever duplicate a row that was scraped very
+        # recently (same page or an adjacent one), so only look back a bounded
+        # window rather than the team's whole-season history: two genuinely
+        # different games between the same two teams, weeks apart, can
+        # occasionally share identical odds by coincidence, and checking the
+        # full history would wrongly drop that second, legitimate game.
+        RECENT_DUPLICATE_LOOKBACK = 8
+        existing_home_games = games.get(homeTeamName, [])
+        if any(g.opponent == awayTeamName and g.outcome == homeWon
+               and g.winOdds == homeWinOdds and g.loseOdds == awayWinOdds
+               for g in existing_home_games[-RECENT_DUPLICATE_LOOKBACK:]):
+            print(f"  ⚠️  Skipping duplicate game row: {homeTeamName} vs {awayTeamName} (already scraped)")
+            return
+
+        # Create game objects (gameNumber will be set later during post-processing)
+        homeGame = Game(
+            team=homeTeamName,
+            opponent=awayTeamName,
+            outcome=homeWon,
+            winOdds=homeWinOdds,
+            loseOdds=awayWinOdds,
+            seasonStartYear=seasonStartYear
+        )
+
+        awayGame = Game(
+            team=awayTeamName,
+            opponent=homeTeamName,
+            outcome=awayWon,
+            winOdds=awayWinOdds,
+            loseOdds=homeWinOdds,
+            seasonStartYear=seasonStartYear
+        )
+
+        # Add games to dictionary (game numbers will be set later)
+        for game in [homeGame, awayGame]:
+            if game.team not in games:
+                games[game.team] = []
+            games[game.team].append(game)
+
+    def _fetchOddsFromDetailPage(self, row):
+        """
+        Fallback for when odds aren't shown on the main results page:
+        navigates to the individual game's detail page to get them, and
+        determines the winner from the original row HTML.
+
+        Args:
+            row: BeautifulSoup element of the game row
+
+        Returns:
+            tuple: (homeWon, awayWon, homeWinOdds, awayWinOdds)
+        """
+        # Find the game detail page link
+        game_row_div = row.select_one('[data-testid="game-row"]')
+        first_link = game_row_div.find('a', href=True)
+
+        if not first_link:
+            print("  ⚠️  No link found in game row, returning defaults")
+            return False, False, -1, -1
+
+        # Navigate to the game detail page
+        game_url = "https://www.oddsportal.com" + first_link['href']
+        print(f"  → Fetching odds from detail page: {game_url}")
+        self.driver.get(game_url)
+
+        # Wait for odds to load
+        try:
+            self.waitForElement('[data-testid="odd-container"]')
+        except Exception:
+            print("  ⚠️  Timeout waiting for odds on detail page")
+            return False, False, -1, -1
+
+        # Get the odds from the detail page
+        detail_soup = BeautifulSoup(self.driver.page_source, "lxml")
+        odds_elements = detail_soup.select('[data-testid="odd-container"]')
+
+        if len(odds_elements) < 2:
+            print("  ⚠️  Not enough odds elements found on detail page")
+            return False, False, -1, -1
+
+        try:
+            homeWinOdds = int(odds_elements[0].text.strip())
+            awayWinOdds = int(odds_elements[1].text.strip())
+        except (ValueError, AttributeError) as e:
+            print(f"  ⚠️  Error parsing odds: {e}")
+            return False, False, -1, -1
+
+        # Determine winner from original row
+        # Find the participant-name elements
+        participant_names = row.select('p.participant-name')
+
+        if len(participant_names) < 2:
+            print("  ⚠️  Not enough participant names found")
+            return False, False, homeWinOdds, awayWinOdds
+
+        # Check if the first participant's parent div has 'font-bold' class
+        # indicating they won
+        first_participant_parent = participant_names[0].parent
+
+        # The parent div structure might vary, so check the immediate parent
+        # and its classes
+        if first_participant_parent and 'font-bold' in first_participant_parent.get('class', []):
+            homeWon = True
+            awayWon = False
+        else:
+            homeWon = False
+            awayWon = True
+
+        print(f"  ✓ Odds retrieved: Home={homeWinOdds}, Away={awayWinOdds}, HomeWon={homeWon}")
+
+        return homeWon, awayWon, homeWinOdds, awayWinOdds
 
     # Scrapes all games for a season (with OddsPortal-specific handling).
     # cache_dir: if given, each page's rendered HTML is cached there once it
