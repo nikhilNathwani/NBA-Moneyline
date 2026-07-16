@@ -21,7 +21,7 @@ from util.game import Game
 # OddsPortal only gives a season its own archived results URL once a newer
 # season has started; the most recently completed season is only reachable
 # via the generic (season-agnostic) "current results" URL until then. Both
-# URLs are needed - see _resolveSeasonUrlBuilder in oddsportal_scraper.py,
+# URLs are needed - see _resolveSeasonUrlBuilder in scraper.py,
 # which live-checks which one applies for the requested season rather than
 # hardcoding an assumption that breaks as soon as a new season starts.
 

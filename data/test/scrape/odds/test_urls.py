@@ -5,8 +5,8 @@ OddsPortal only archives a season under its own URL once a newer season has
 started; the most recently completed season is only reachable via the
 generic "current results" page until then. These functions are how the
 scraper detects which case applies (see _resolveSeasonUrlBuilder in
-oddsportal_scraper.py) instead of hardcoding an assumption that breaks the
-moment a new season begins.
+scraper.py) instead of hardcoding an assumption that breaks the moment a
+new season begins.
 """
 
 from scrape.odds.parser import makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason
