@@ -52,7 +52,7 @@ public/
 data/
   main.py                     # End-to-end scrape, validate, and migrate flow
   scrape/                     # OddsPortal moneyline scraping
-  storage/                    # SQLite save/verify, schedule validation, Postgres migration
+  storage/                    # Staging save/verify, schedule comparison, production migration
   util/                       # Shared data model, constants, output, frontend update
   YEARLY_WORKFLOW.md          # Operational yearly procedure
 ```

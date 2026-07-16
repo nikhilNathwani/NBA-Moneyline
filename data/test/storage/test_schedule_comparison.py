@@ -1,11 +1,11 @@
 """
-Tests for the pure comparison logic in storage.schedule_validation.
+Tests for the pure comparison logic in storage.schedule_comparison.
 
 These use synthetic opponent lists (no network, no fixtures) since
 compare_opponent_multisets is a pure function.
 """
 
-from storage.schedule_validation import compare_opponent_multisets
+from storage.schedule_comparison import compare_opponent_multisets
 
 
 def test_identical_sequences_match():

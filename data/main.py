@@ -39,12 +39,12 @@ def check_requirements():
 check_requirements()
 
 from scrape.odds.oddsportal_scraper import OddsPortalScraper
-from storage.sqlite_db import save_to_database, verify_scraped_data
-from storage.postgres_db import (
+from storage.staging_db import save_to_database, verify_scraped_data
+from storage.production_db import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
-from storage.schedule_validation import validate_scraped_data_against_schedule
+from storage.schedule_comparison import validate_scraped_data_against_schedule
 from util.console_output import (
     print_verification_results,
     print_schedule_validation_results,

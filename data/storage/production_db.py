@@ -1,8 +1,9 @@
 """
-Postgres database utilities for the NBA Moneyline data pipeline.
+Production database (Postgres) utilities for the NBA Moneyline data pipeline.
 
-Handles migration from SQLite to Postgres (Step 3) and verifying the
-migrated data (Steps 5-6). For the local SQLite side, see util/sqlite_db.py.
+Handles migrating games from the local staging database into the
+production database that the web app reads from (Step 3), and verifying
+the migration (Steps 5-6). For the staging side, see storage/staging_db.py.
 """
 
 import os
@@ -14,7 +15,7 @@ from typing import Dict, Tuple
 
 def get_postgres_connection():
     """Get connection to Vercel Postgres database."""
-    # From data/storage/postgres_db.py, go up 2 levels to project root
+    # From data/storage/production_db.py, go up 2 levels to project root
     env_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
         '.env.development.local'

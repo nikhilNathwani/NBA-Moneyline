@@ -1,9 +1,9 @@
 """
-SQLite utilities for the NBA Moneyline data pipeline.
+Staging database (SQLite) utilities for the NBA Moneyline data pipeline.
 
-Handles saving scraped game data to SQLite (Step 1) and verifying it
-before migration to Postgres (Step 2). For Postgres-side storage, see
-util/postgres_db.py.
+Scraped game data lands here temporarily: saved to SQLite (Step 1) and
+verified (Step 2) before migration to the production database. Deleted
+once migration succeeds. For the production side, see storage/production_db.py.
 """
 
 import sqlite3
