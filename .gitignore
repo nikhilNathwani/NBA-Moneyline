@@ -11,9 +11,6 @@ __pycache__/
 *$py.class
 *.so
 
-# Temporary SQLite databases
-data/*.db
-
 # Cached basketball-reference schedule pages (schedule validation)
 data/.bbref_cache/
 

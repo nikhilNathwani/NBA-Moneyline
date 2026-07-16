@@ -39,7 +39,6 @@ def check_requirements():
 check_requirements()
 
 from scrape.odds.oddsportal_scraper import OddsPortalScraper
-from scrape.save_scraped_data import save_to_database
 from scrape.verification import verify_scraped_data, validate_scraped_data_against_schedule
 from publish.migrate_to_production import (
     verify_postgres_migration,
@@ -56,8 +55,7 @@ from util.console_output import (
 )
 
 
-# Define output paths
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Directory this script lives in, used for the basketball-reference schedule cache
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -91,61 +89,43 @@ def main():
         help='Run browser in headless mode'
     )
     parser.add_argument(
-        '--skip-scrape',
-        action='store_true',
-        help='Skip scraping, only verify and migrate existing data'
-    )
-    parser.add_argument(
         '--skip-schedule-validation',
         action='store_true',
         help='Skip comparing scraped opponents against basketball-reference\'s authoritative schedule'
     )
-    
+
     args = parser.parse_args()
     seasons = parse_seasons(args.seasons)
-    
+
     print(f"\n{'='*70}")
     print(f"🏀 NBA MONEYLINE DATA PIPELINE")
     print(f"{'='*70}")
     print(f"Seasons: {', '.join(f'{s}-{(s+1)%100:02d}' for s in seasons)}\n")
-    
+
     # Track successfully migrated seasons for frontend update
     migrated_seasons = []
-    
+
     # Process each season
     for season in seasons:
-        db_filename = f"moneyline_{season%100:02d}.db"
-        db_path = os.path.join(DATA_DIR, db_filename)
-        
         # Step 1: Scrape data
-        if not args.skip_scrape:
-            print(f"\n{'='*70}")
-            print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
-            print(f"{'='*70}\n")
-            
-            scraper = OddsPortalScraper(headless=args.headless)
-            try:
-                season_games = scraper.scrapeSeasonSchedule(season)
-            except RuntimeError as e:
-                print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
-                print(f"⏭️  Skipping this season and moving on (no data was saved for it).")
-                continue
+        print(f"\n{'='*70}")
+        print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
+        print(f"{'='*70}\n")
 
-            # Save to database
-            save_to_database({season: season_games}, db_path)
-            print(f"\n✅ Saved data to: {db_path}")
-        else:
-            print(f"\n⏭️  Skipping scrape, using existing database: {db_path}")
-            if not os.path.exists(db_path):
-                print(f"❌ Error: Database file not found: {db_path}")
-                continue
-        
+        scraper = OddsPortalScraper(headless=args.headless)
+        try:
+            season_games = scraper.scrapeSeasonSchedule(season)
+        except RuntimeError as e:
+            print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
+            print(f"⏭️  Skipping this season and moving on (no data was saved for it).")
+            continue
+
         # Step 2: Verify scraped data
         print(f"\n{'='*70}")
         print(f"STEP 2: VERIFYING SCRAPED DATA")
         print(f"{'='*70}")
-        
-        verification_results = verify_scraped_data(db_path, season)
+
+        verification_results = verify_scraped_data(season_games)
         print_verification_results(season, verification_results)
 
         # Step 2.5: Validate scraped opponents against the authoritative schedule
@@ -155,63 +135,59 @@ def main():
             print(f"{'='*70}")
 
             cache_dir = os.path.join(DATA_DIR, '.bbref_cache', str(season))
-            schedule_comparisons = validate_scraped_data_against_schedule(db_path, season, cache_dir=cache_dir)
+            schedule_comparisons = validate_scraped_data_against_schedule(season_games, season, cache_dir=cache_dir)
             print_schedule_validation_results(season, schedule_comparisons)
 
         # Step 3: Prompt for migration
         print(f"{'='*70}")
         print(f"STEP 3: MIGRATION TO VERCEL POSTGRES")
         print(f"{'='*70}\n")
-        
+
         response = input(f"Ready to migrate {season}-{(season+1)%100:02d} data to Vercel Postgres? (Y/n): ").strip().upper()
-        
+
         if response in ['Y', 'YES', '']:
             print(f"\n🚀 Starting migration for {season}-{(season+1)%100:02d}...\n")
-            
+
             try:
-                inserted = migrate_season_to_postgres(db_path, season)
+                inserted = migrate_season_to_postgres(season_games, season)
                 print(f"\n✅ Migration complete: {inserted} games inserted")
-                
+
                 # Track this season for frontend update
                 migrated_seasons.append(season)
-                
-                # Clean up temporary SQLite database after successful migration
-                os.remove(db_path)
-                print(f"🗑️  Cleaned up temporary database: {db_path}")
             except Exception as e:
                 print(f"\n❌ Migration failed: {e}")
                 continue
         else:
             print(f"\n⏭️  Skipping migration for {season}-{(season+1)%100:02d}")
             continue
-    
+
     # Step 4: Update frontend with new seasons
     if migrated_seasons:
         print(f"\n{'='*70}")
         print(f"STEP 4: UPDATING FRONTEND SEASONS LIST")
         print(f"{'='*70}\n")
-        
+
         seasons_added = update_seasons_list(migrated_seasons)
-        
+
         if seasons_added:
             season_strs = ', '.join(f"{s}-{(s+1)%100:02d}" for s in migrated_seasons)
             print(f"📝 Added {season_strs} to frontend seasons list")
-            
+
             if commit_and_push_changes(migrated_seasons):
                 print(f"✅ Changes committed and pushed to git")
             else:
                 print(f"⚠️  Git operation failed (changes may need manual commit)")
         else:
             print(f"ℹ️  Seasons already exist in frontend, no update needed")
-    
+
     # Step 5: Final verification
     print(f"\n{'='*70}")
     print(f"STEP 5: FINAL DATABASE VERIFICATION")
     print(f"{'='*70}")
-    
+
     postgres_results = verify_postgres_migration()
     print_postgres_verification(postgres_results)
-    
+
     print(f"{'='*70}")
     print(f"✅ PIPELINE COMPLETE!")
     print(f"{'='*70}\n")

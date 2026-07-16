@@ -17,8 +17,7 @@ Replace `2025` with the season start year (e.g., for 2025-26 season, use 2025).
 
 -   Opens Chrome browser (or runs headless with `--headless` flag)
 -   Navigates to OddsPortal.com NBA results pages
--   Scrapes all games for each team in the season
--   Saves to temporary SQLite file: `data/moneyline_XX.db`
+-   Scrapes all games for each team in the season, held in memory
 
 ### Step 2: Verification
 
@@ -81,7 +80,6 @@ Ready to migrate 2024-25 data to Vercel Postgres? (Y/n):
     -   `winOdds/loseOdds`: INTEGER → VARCHAR with +/- prefix
 -   Inserts all games into production database
 -   Shows count of inserted games
--   Deletes temporary SQLite file
 
 ### Step 5: Update Frontend
 
@@ -115,9 +113,6 @@ python3 main.py --seasons 2024 2025
 
 # Scrape a range of seasons
 python3 main.py --seasons 2020-2024
-
-# Skip scraping, just verify and migrate existing SQLite file
-python3 main.py --seasons 2025 --skip-scrape
 ```
 
 ## After Migration
@@ -150,7 +145,9 @@ python3 main.py --seasons 2025 --skip-scrape
 
 -   Review the specific games mentioned
 -   May need to manually check those games on OddsPortal
--   Fix data in SQLite before migrating: `sqlite3 data/moneyline_XX.db`
+-   Data only exists in memory for the duration of a run - type `n` at the Step 3
+    prompt to decline migration, fix the underlying scraper issue, and re-run
+    from scratch rather than trying to patch the data mid-run
 
 ### Migration fails
 
@@ -207,7 +204,9 @@ POSTGRES_URL=postgres://username:password@host/database
 -   **In-Season Tournament**: Knockout-round (quarterfinal/semifinal) games are excluded;
     which teams/counts that affects is detected automatically each season (not hardcoded
     to a specific bracket), so this should keep working even if the bracket size changes
--   **Backups**: SQLite files serve as temporary storage; Postgres is the source of truth
+-   **No intermediate storage**: scraped data lives in memory for the duration of a
+    run and is never persisted locally; Postgres is the only source of truth. A
+    failed migration means re-running the whole pipeline (which is safe - see below)
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
 -   **Tests**: `pytest data/test/` runs the parsing/comparison logic against saved

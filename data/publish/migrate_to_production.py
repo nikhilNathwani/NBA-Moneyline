@@ -1,14 +1,15 @@
 """
 Publishes verified games to the production database (Postgres) that the
 web app reads from - migrates them over (Step 3) and verifies the
-migration (Steps 5-6). For the staging side, see scrape/save_scraped_data.py.
+migration (Steps 5-6).
 """
 
 import os
-import sqlite3
 import psycopg2
 from dotenv import load_dotenv
-from typing import Dict, Tuple
+from typing import Dict, List
+
+from util.game import Game
 
 
 def get_postgres_connection():
@@ -25,7 +26,7 @@ def get_postgres_connection():
 def verify_postgres_migration() -> Dict:
     """
     Verify data in Postgres database.
-    
+
     Returns dict with:
         - season_counts: list of (season, count) tuples
         - error: str (if connection failed)
@@ -33,7 +34,7 @@ def verify_postgres_migration() -> Dict:
     try:
         conn = get_postgres_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT seasonstartyear, COUNT(*) as game_count
             FROM games
@@ -41,73 +42,52 @@ def verify_postgres_migration() -> Dict:
             ORDER BY seasonstartyear
         """)
         season_counts = cursor.fetchall()
-        
+
         conn.close()
-        
+
         return {'season_counts': season_counts}
     except Exception as e:
         return {'error': str(e)}
 
 
-def migrate_season_to_postgres(db_path: str, season: int) -> int:
+def migrate_season_to_postgres(team_games: Dict[str, List[Game]], season: int) -> int:
     """
-    Migrate a season from SQLite to Postgres.
-    
+    Migrate a season's scraped games to Postgres.
+
     Args:
-        db_path: Path to SQLite database
+        team_games: scraped games straight from the scraper's output
         season: Season start year to migrate
-        
+
     Returns:
         Number of games inserted
     """
-    # Get SQLite data
-    sqlite_conn = sqlite3.connect(db_path)
-    cursor = sqlite_conn.cursor()
-    
-    cursor.execute("""
-        SELECT team, seasonStartYear, gameNumber, outcome, winOdds, loseOdds
-        FROM games
-        WHERE seasonStartYear = ?
-        ORDER BY team, gameNumber
-    """, (season,))
-    
-    games = cursor.fetchall()
-    sqlite_conn.close()
-    
-    # Get Postgres connection
     pg_conn = get_postgres_connection()
     pg_cursor = pg_conn.cursor()
-    
+
     # Delete existing data for this season
     pg_cursor.execute("DELETE FROM games WHERE seasonstartyear = %s", (season,))
     print(f"  Deleted existing data for {season}-{(season+1)%100:02d} season")
-    
+
     # Insert new data
     inserted = 0
-    for game in games:
-        team, season_year, game_num, outcome, win_odds, lose_odds = game
-        
-        # Convert outcome to boolean
-        outcome_bool = bool(outcome)
-        
-        # Format odds as strings with +/- prefix
-        win_odds_int = int(win_odds)
-        lose_odds_int = int(lose_odds)
-        win_odds_str = f"+{win_odds_int}" if win_odds_int > 0 else str(win_odds_int)
-        lose_odds_str = f"+{lose_odds_int}" if lose_odds_int > 0 else str(lose_odds_int)
-        
-        try:
-            pg_cursor.execute("""
-                INSERT INTO games (team, seasonstartyear, gamenumber, outcome, winodds, loseodds)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (team, season_year, game_num, outcome_bool, win_odds_str, lose_odds_str))
-            inserted += 1
-        except Exception as e:
-            print(f"  ⚠️  Error inserting game: {team} game {game_num}: {e}")
-            pg_conn.rollback()
-            continue
-    
+    for team, games in sorted(team_games.items()):
+        for game in games:
+            # Format odds as strings with +/- prefix
+            win_odds_str = f"+{game.winOdds}" if game.winOdds > 0 else str(game.winOdds)
+            lose_odds_str = f"+{game.loseOdds}" if game.loseOdds > 0 else str(game.loseOdds)
+
+            try:
+                pg_cursor.execute("""
+                    INSERT INTO games (team, seasonstartyear, gamenumber, outcome, winodds, loseodds)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (team, season, game.gameNumber, game.outcome, win_odds_str, lose_odds_str))
+                inserted += 1
+            except Exception as e:
+                print(f"  ⚠️  Error inserting game: {team} game {game.gameNumber}: {e}")
+                pg_conn.rollback()
+                continue
+
     pg_conn.commit()
     pg_conn.close()
-    
+
     return inserted

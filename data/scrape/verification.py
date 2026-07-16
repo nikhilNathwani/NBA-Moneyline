@@ -12,9 +12,11 @@ to migrate to production, two ways:
   chronological position in the odd case where the game was postponed and
   replayed on a different date, so we only check *which* opponents (and
   how many times each) a team played, not what order they appear in.
+
+Both work directly on the scraper's in-memory output - there's no
+intermediate storage to verify against.
 """
 
-import sqlite3
 from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -22,11 +24,12 @@ from typing import Dict, List, Optional
 from scrape.schedules.fetcher import fetchAllTeamSchedules
 from scrape.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
 from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
+from util.game import Game
 
 
-def verify_scraped_data(db_path: str, season: int) -> Dict:
+def verify_scraped_data(team_games: Dict[str, List[Game]]) -> Dict:
     """
-    Verify scraped data in SQLite database.
+    Verify scraped data straight from the scraper's output.
 
     Returns dict with:
         - total_games: int
@@ -40,24 +43,8 @@ def verify_scraped_data(db_path: str, season: int) -> Dict:
         - distribution_mismatch: dict of {expected_count: (expected_teams, actual_teams)}
           for counts that exist in the distribution but with the wrong number of teams
     """
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Get total game count
-    cursor.execute("SELECT COUNT(*) FROM games WHERE seasonStartYear = ?", (season,))
-    total_games = cursor.fetchone()[0]
-
-    # Get game count per team
-    cursor.execute("""
-        SELECT team, COUNT(*) as game_count
-        FROM games
-        WHERE seasonStartYear = ?
-        GROUP BY team
-        ORDER BY team
-    """, (season,))
-    team_counts = cursor.fetchall()
-
-    conn.close()
+    team_counts = sorted((team, len(games)) for team, games in team_games.items())
+    total_games = sum(count for _, count in team_counts)
 
     count_tally = Counter(count for _, count in team_counts)
 
@@ -103,27 +90,14 @@ def compare_opponent_multisets(true_opponents: List[str], scraped_opponents: Lis
     }
 
 
-def get_scraped_opponents(db_path: str, season: int, team_full_name: str) -> List[str]:
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT opponent FROM games
-        WHERE team = ? AND seasonStartYear = ?
-        ORDER BY gameNumber
-    """, (team_full_name, season))
-    opponents = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return opponents
-
-
-def validate_scraped_data_against_schedule(db_path: str, season: int,
+def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]], season: int,
                                             cache_dir: Optional[str] = None) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
     authoritative schedule (IST knockout and play-in games excluded).
 
     Args:
-        db_path: path to the season's SQLite database
+        team_games: scraped games straight from the scraper's output
         season: seasonStartYear (e.g. 2025 for the 2025-26 season)
         cache_dir: optional directory to cache fetched schedule HTML in,
                    so repeated runs (e.g. during development) don't
@@ -135,7 +109,7 @@ def validate_scraped_data_against_schedule(db_path: str, season: int,
     for team_full_name, html in html_by_team.items():
         games = parseScheduleTable(html)
         true_opponents = getTrueRegularSeasonOpponents(games)
-        scraped_opponents = get_scraped_opponents(db_path, season, team_full_name)
+        scraped_opponents = [g.opponent for g in team_games.get(team_full_name, [])]
 
         diff = compare_opponent_multisets(true_opponents, scraped_opponents)
         results.append(TeamScheduleComparison(
