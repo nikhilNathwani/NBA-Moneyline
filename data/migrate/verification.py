@@ -19,8 +19,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from migrate.bbref.fetcher import fetchAllTeamSchedules
-from migrate.bbref.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from migrate.reference_schedule.fetcher import fetchAllTeamSchedules
+from migrate.reference_schedule.parser import parseScheduleTable, getTrueRegularSeasonOpponents
 from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
 
 
