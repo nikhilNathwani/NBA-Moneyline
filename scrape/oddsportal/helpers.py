@@ -98,6 +98,25 @@ def scrapeGamesFromRow(row, seasonStartYear: int, games: Dict[str, List[Game]], 
             print(f"  ❌ SKIPPED: {homeTeamName} vs {awayTeamName} (error parsing odds: {e})")
             return
     
+    # Guard against re-scraping the same game twice.
+    # This happens when a page transition races ahead of the DOM swap (the
+    # last game row of the previous page is still present when the next
+    # page is scraped) or when a page renders a "featured game" widget that
+    # duplicates a row already present elsewhere in the same page's list.
+    # Both failure modes only ever duplicate a row that was scraped very
+    # recently (same page or an adjacent one), so only look back a bounded
+    # window rather than the team's whole-season history: two genuinely
+    # different games between the same two teams, weeks apart, can
+    # occasionally share identical odds by coincidence, and checking the
+    # full history would wrongly drop that second, legitimate game.
+    RECENT_DUPLICATE_LOOKBACK = 8
+    existing_home_games = games.get(homeTeamName, [])
+    if any(g.opponent == awayTeamName and g.outcome == homeWon
+           and g.winOdds == homeWinOdds and g.loseOdds == awayWinOdds
+           for g in existing_home_games[-RECENT_DUPLICATE_LOOKBACK:]):
+        print(f"  ⚠️  Skipping duplicate game row: {homeTeamName} vs {awayTeamName} (already scraped)")
+        return
+
     # Create game objects (gameNumber will be set later during post-processing)
     homeGame = Game(
         team=homeTeamName,
@@ -107,7 +126,7 @@ def scrapeGamesFromRow(row, seasonStartYear: int, games: Dict[str, List[Game]], 
         loseOdds=awayWinOdds,
         seasonStartYear=seasonStartYear
     )
-    
+
     awayGame = Game(
         team=awayTeamName,
         opponent=homeTeamName,
@@ -116,7 +135,7 @@ def scrapeGamesFromRow(row, seasonStartYear: int, games: Dict[str, List[Game]], 
         loseOdds=homeWinOdds,
         seasonStartYear=seasonStartYear
     )
-    
+
     # Add games to dictionary (game numbers will be set later)
     for game in [homeGame, awayGame]:
         if game.team not in games:

@@ -48,8 +48,10 @@ from scrape.utils.postgres_utils import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
+from scrape.utils.schedule_validation import validate_scraped_data_against_schedule
 from scrape.utils.console_output import (
     print_verification_results,
+    print_schedule_validation_results,
     print_postgres_verification
 )
 from scrape.utils.update_frontend import (
@@ -97,6 +99,11 @@ def main():
         action='store_true',
         help='Skip scraping, only verify and migrate existing data'
     )
+    parser.add_argument(
+        '--skip-schedule-validation',
+        action='store_true',
+        help='Skip comparing scraped opponents against basketball-reference\'s authoritative schedule'
+    )
     
     args = parser.parse_args()
     seasons = parse_seasons(args.seasons)
@@ -139,7 +146,17 @@ def main():
         
         verification_results = verify_scraped_data(db_path, season)
         print_verification_results(season, verification_results)
-        
+
+        # Step 2.5: Validate scraped opponents against the authoritative schedule
+        if not args.skip_schedule_validation:
+            print(f"\n{'='*70}")
+            print(f"STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
+            print(f"{'='*70}")
+
+            cache_dir = os.path.join(SCRAPE_DIR, '.bbref_cache', str(season))
+            schedule_comparisons = validate_scraped_data_against_schedule(db_path, season, cache_dir=cache_dir)
+            print_schedule_validation_results(season, schedule_comparisons)
+
         # Step 3: Prompt for migration
         print(f"{'='*70}")
         print(f"STEP 3: MIGRATION TO VERCEL POSTGRES")

@@ -156,14 +156,55 @@ class SeleniumWebDriver:
     def waitForElement(self, css_selector: str):
         """
         Wait for an element to be present on the page.
-        
+
         Args:
             css_selector (str): CSS selector of the element to wait for
         """
         if self.driver is None:
             raise RuntimeError("Driver not initialized. Call initDriver() first.")
-        
+
         WebDriverWait(self.driver, self.wait_time).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, css_selector))
         )
         time.sleep(2) #Additional wait to ensure content is fully loaded
+
+    def waitForStableElementCount(self, css_selector: str, min_count: int = 1,
+                                   stable_checks: int = 3, poll_interval: float = 1.0,
+                                   timeout: float = 20.0):
+        """
+        Wait until the number of elements matching css_selector stops changing.
+
+        Guards against scraping a page mid-transition: on a slow render, the
+        pagination-active-link/button can appear before the game rows have
+        finished swapping in (or while stale rows from the previous page are
+        still being removed), which causes games to be missed or duplicated
+        across the page boundary. Polling the row count until it's stable
+        confirms the DOM has actually settled before we parse it.
+
+        Args:
+            css_selector: CSS selector of the repeating elements to count (e.g. eventRow)
+            min_count: minimum element count required before considering it stable
+            stable_checks: number of consecutive matching counts required
+            poll_interval: seconds between polls
+            timeout: max seconds to wait before giving up and proceeding anyway
+        """
+        if self.driver is None:
+            raise RuntimeError("Driver not initialized. Call initDriver() first.")
+
+        start = time.time()
+        last_count = -1
+        consecutive_matches = 0
+
+        while time.time() - start < timeout:
+            count = len(self.driver.find_elements(By.CSS_SELECTOR, css_selector))
+            if count >= min_count and count == last_count:
+                consecutive_matches += 1
+                if consecutive_matches >= stable_checks:
+                    return count
+            else:
+                consecutive_matches = 0
+            last_count = count
+            time.sleep(poll_interval)
+
+        print(f"  ⚠️  Element count for '{css_selector}' never stabilized within {timeout}s (last count: {last_count})")
+        return last_count

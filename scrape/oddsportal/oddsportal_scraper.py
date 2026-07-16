@@ -26,6 +26,14 @@ class OddsPortalScraper(BaseScraper, SeleniumWebDriver):
     # Initialize the OddsPortal scraper.
     def __init__(self, headless: bool = False):
         SeleniumWebDriver.__init__(self, headless)
+        # Carries over across page boundaries: a date's games can legitimately
+        # span two pages, and the date header only appears once (on whichever
+        # page that date started on), so this must not reset per-page.
+        self._isRegularSeasonNow = False
+        # Tracks the largest non-header eventRow count seen on a "good" page
+        # so far this season, used to detect pages that rendered a stale/
+        # partial loading skeleton instead of the full row set.
+        self._max_nonheader_rows_seen = 0
     
     # Returns list of URLs for all pages of a season's results.
     def getSeasonScheduleLinks(self, seasonStartYear: int) -> List[str]:
@@ -37,24 +45,70 @@ class OddsPortalScraper(BaseScraper, SeleniumWebDriver):
         return [makeUrl(seasonStartYear, pageNum) for pageNum in range(1, lastPageNum + 1)]
     
     # Scrapes all games from a single OddsPortal results page.
-    def scrapeGamesFromPage(self, url: str, page_num: int,seasonStartYear: int, games: Dict[str, List[Game]]):
-        # Launch oddsportal webpage
-        self.loadWebPage(url)
+    def scrapeGamesFromPage(self, url: str, page_num: int, seasonStartYear: int, games: Dict[str, List[Game]],
+                             max_attempts: int = 5):
+        gameRows = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                # Launch oddsportal webpage
+                self.loadWebPage(url)
 
-        # Wait for the active pagination link to confirm page load
-        self.waitForElement(f"a.pagination-link.active[data-number='{page_num}']")
+                # Wait for the active pagination link to confirm page load
+                self.waitForElement(f"a.pagination-link.active[data-number='{page_num}']")
 
-        # Wait for "Add to My Leagues" button to confirm game table is loaded
-        self.waitForElement('[data-testid="add-to-my-leagues-button"]')
-        
-        soup = self.makeSoup()        
-        gameRows = soup.find_all(class_="eventRow")
-        isRegularSeasonNow= False
+                # Wait for "Add to My Leagues" button to confirm game table is loaded
+                self.waitForElement('[data-testid="add-to-my-leagues-button"]')
+
+                # Wait for the event row count to stop changing before parsing, so we
+                # don't scrape mid-transition (causes missed or duplicated boundary games).
+                # A loading skeleton can render a handful of eventRow-classed
+                # placeholders that sit unchanged for a few seconds while the
+                # real data streams in behind it, so require a long, patient
+                # stable window rather than a quick one.
+                self.waitForStableElementCount(".eventRow", stable_checks=6, poll_interval=1.5, timeout=30)
+
+                soup = self.makeSoup()
+                gameRows = soup.find_all(class_="eventRow")
+
+                header_count = sum(1 for r in gameRows if getDateHeaderRow(r) is not None)
+                non_header_rows = len(gameRows) - header_count
+                rows_with_game_data = sum(1 for r in gameRows if r.select_one('[data-testid="game-row"]') is not None)
+
+                # Sanity check 1: on a fully-rendered page, almost every non-header
+                # eventRow should be a parseable game row (the only legitimate
+                # exclusions are rare odds-missing fallback failures). If most
+                # non-header rows have no `game-row` testid at all, the DOM
+                # likely stalled mid-render (stale/partial content).
+                if non_header_rows > 0 and rows_with_game_data / non_header_rows < 0.8:
+                    raise RuntimeError(
+                        f"Page {page_num} looks incompletely rendered: only "
+                        f"{rows_with_game_data}/{non_header_rows} non-header rows had game data"
+                    )
+
+                # Sanity check 2: compare against the largest row count seen on
+                # a good page so far this season. A page with far fewer rows
+                # than the established norm is likely a stale loading skeleton
+                # that happened to be internally consistent (so check 1 alone
+                # wouldn't catch it), not a genuinely quiet day.
+                if self._max_nonheader_rows_seen >= 20 and non_header_rows < 0.5 * self._max_nonheader_rows_seen:
+                    raise RuntimeError(
+                        f"Page {page_num} has only {non_header_rows} non-header rows, "
+                        f"vs. {self._max_nonheader_rows_seen} seen on a prior page this season"
+                    )
+
+                self._max_nonheader_rows_seen = max(self._max_nonheader_rows_seen, non_header_rows)
+                break
+            except Exception as e:
+                print(f"  ⚠️  Attempt {attempt}/{max_attempts} failed to load page {page_num} ({e.__class__.__name__}: {e}), retrying...")
+        else:
+            print(f"  ❌ Page {page_num} still looked incomplete after {max_attempts} attempts — "
+                  f"proceeding with the last attempt's content. Verify this page's counts manually.")
+
         for gameRow in gameRows:
-            dateHeaderRow= getDateHeaderRow(gameRow) 
+            dateHeaderRow= getDateHeaderRow(gameRow)
             if dateHeaderRow is not None:
-                isRegularSeasonNow= isRegularSeason(dateHeaderRow)
-            if isRegularSeasonNow:
+                self._isRegularSeasonNow = isRegularSeason(dateHeaderRow)
+            if self._isRegularSeasonNow:
                 scrapeGamesFromRow(gameRow, seasonStartYear, games, self.driver)
     
     # Scrapes all games for a season (with OddsPortal-specific handling).        
