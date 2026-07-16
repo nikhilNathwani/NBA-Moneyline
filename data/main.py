@@ -38,8 +38,8 @@ def check_requirements():
 
 check_requirements()
 
-from scrape.odds.oddsportal_scraper import OddsPortalScraper
-from scrape.staging_db import save_to_database
+from scrape.oddsportal_scraper import OddsPortalScraper
+from scrape.save_scraped_data import save_to_database
 from migrate.production_db import (
     verify_postgres_migration,
     migrate_season_to_postgres

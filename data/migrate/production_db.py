@@ -3,7 +3,7 @@ Production database (Postgres) utilities for the NBA Moneyline data pipeline.
 
 Handles migrating games from the local staging database into the
 production database that the web app reads from (Step 3), and verifying
-the migration (Steps 5-6). For the staging side, see scrape/staging_db.py.
+the migration (Steps 5-6). For the staging side, see scrape/save_scraped_data.py.
 """
 
 import os

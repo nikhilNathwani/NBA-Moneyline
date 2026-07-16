@@ -57,7 +57,7 @@ pip list
 ```bash
 cd data
 source .venv/bin/activate
-python3 -c "from scrape.odds.oddsportal_scraper import OddsPortalScraper; print('✅ Imports work')"
+python3 -c "from scrape.oddsportal_scraper import OddsPortalScraper; print('✅ Imports work')"
 ```
 
 **Expected:** "✅ Imports work" prints
