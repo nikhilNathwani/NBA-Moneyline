@@ -38,7 +38,7 @@ def check_requirements():
 
 check_requirements()
 
-from scrape.oddsportal_scraper import OddsPortalScraper
+from scrape.odds.oddsportal_scraper import OddsPortalScraper
 from scrape.save_scraped_data import save_to_database
 from scrape.verification import verify_scraped_data, validate_scraped_data_against_schedule
 from publish.migrate_to_production import (

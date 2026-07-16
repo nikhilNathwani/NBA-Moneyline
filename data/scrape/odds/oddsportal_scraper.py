@@ -10,8 +10,8 @@ this scraper may need updates.
 
 from typing import List, Dict
 from util.game import Game
-from scrape.selenium_webdriver import SeleniumWebDriver
-from scrape.helpers import (
+from scrape.odds.selenium_webdriver import SeleniumWebDriver
+from scrape.odds.helpers import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
     getLastPageNum, getDateHeaderRow, isRegularSeason, scrapeGamesFromRow, reverseGameNumbers
 )
