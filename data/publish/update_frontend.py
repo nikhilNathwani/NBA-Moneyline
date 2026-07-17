@@ -9,31 +9,33 @@ import re
 import subprocess
 from typing import List
 
+from util.paths import PROJECT_ROOT
+
+SEASONS_ARRAY_PATTERN = r'const seasons = \[([\s\S]*?)\];'
+
 
 def get_render_filters_path() -> str:
     """Get the absolute path to renderFilters.js."""
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(project_root, 'public', 'js', 'view', 'renderFilters.js')
+    return os.path.join(PROJECT_ROOT, 'public', 'js', 'view', 'renderFilters.js')
 
 
 def read_seasons_list() -> List[str]:
     """Read the current seasons list from renderFilters.js."""
     file_path = get_render_filters_path()
-    
+
     with open(file_path, 'r') as f:
         content = f.read()
-    
+
     # Find the seasons array using regex
-    pattern = r'const seasons = \[([\s\S]*?)\];'
-    match = re.search(pattern, content)
-    
+    match = re.search(SEASONS_ARRAY_PATTERN, content)
+
     if not match:
         raise ValueError("Could not find seasons array in renderFilters.js")
-    
+
     # Extract season strings
     seasons_text = match.group(1)
     seasons = re.findall(r'"(\d{4}-\d{2})"', seasons_text)
-    
+
     return seasons
 
 
@@ -67,8 +69,7 @@ def update_seasons_list(new_season: int) -> bool:
     seasons_array += '];'
     
     # Replace the old seasons array with the new one
-    pattern = r'const seasons = \[([\s\S]*?)\];'
-    new_content = re.sub(pattern, seasons_array, content)
+    new_content = re.sub(SEASONS_ARRAY_PATTERN, seasons_array, content)
     
     # Write back to file
     with open(file_path, 'w') as f:
@@ -87,22 +88,21 @@ def commit_and_push_changes(season: int) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     file_path = get_render_filters_path()
-    
+
     try:
         # Stage the file
         subprocess.run(
             ['git', 'add', file_path],
-            cwd=project_root,
+            cwd=PROJECT_ROOT,
             check=True,
             capture_output=True
         )
-        
+
         # Check if there are actually changes to commit
         result = subprocess.run(
             ['git', 'diff', '--cached', '--exit-code', file_path],
-            cwd=project_root,
+            cwd=PROJECT_ROOT,
             capture_output=True
         )
         
@@ -118,7 +118,7 @@ def commit_and_push_changes(season: int) -> bool:
         # Commit
         subprocess.run(
             ['git', 'commit', '-m', commit_msg],
-            cwd=project_root,
+            cwd=PROJECT_ROOT,
             check=True,
             capture_output=True
         )
@@ -126,7 +126,7 @@ def commit_and_push_changes(season: int) -> bool:
         # Push
         subprocess.run(
             ['git', 'push'],
-            cwd=project_root,
+            cwd=PROJECT_ROOT,
             check=True,
             capture_output=True
         )

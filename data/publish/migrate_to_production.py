@@ -10,15 +10,12 @@ from dotenv import load_dotenv
 from typing import Dict, List
 
 from util.game import Game
+from util.paths import PROJECT_ROOT
 
 
 def get_postgres_connection():
     """Get connection to Vercel Postgres database."""
-    # From data/publish/migrate_to_production.py, go up 2 levels to project root
-    env_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        '.env.development.local'
-    )
+    env_path = os.path.join(PROJECT_ROOT, '.env.development.local')
     load_dotenv(env_path)
     return psycopg2.connect(os.getenv('POSTGRES_URL'))
 
@@ -50,6 +47,11 @@ def verify_postgres_migration() -> Dict:
         return {'error': str(e)}
 
 
+def _formatOdds(odds: int) -> str:
+    """Format moneyline odds as a string with an explicit +/- prefix."""
+    return f"+{odds}" if odds > 0 else str(odds)
+
+
 def migrate_season_to_postgres(team_games: Dict[str, List[Game]], season: int) -> int:
     """
     Migrate a season's scraped games to Postgres.
@@ -72,9 +74,8 @@ def migrate_season_to_postgres(team_games: Dict[str, List[Game]], season: int) -
     inserted = 0
     for team, games in sorted(team_games.items()):
         for game in games:
-            # Format odds as strings with +/- prefix
-            win_odds_str = f"+{game.winOdds}" if game.winOdds > 0 else str(game.winOdds)
-            lose_odds_str = f"+{game.loseOdds}" if game.loseOdds > 0 else str(game.loseOdds)
+            win_odds_str = _formatOdds(game.winOdds)
+            lose_odds_str = _formatOdds(game.loseOdds)
 
             try:
                 pg_cursor.execute("""

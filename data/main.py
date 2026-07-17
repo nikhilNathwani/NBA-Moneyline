@@ -54,6 +54,7 @@ from publish.update_frontend import (
     commit_and_push_changes
 )
 from util.console_output import (
+    print_section_header,
     print_verification_results,
     print_schedule_validation_results,
     print_postgres_verification
@@ -91,9 +92,7 @@ def main():
     args = parser.parse_args()
     season = args.season
 
-    print(f"\n{'='*70}")
-    print(f"🏀 NBA MONEYLINE DATA PIPELINE")
-    print(f"{'='*70}")
+    print_section_header("🏀 NBA MONEYLINE DATA PIPELINE")
     print(f"Season: {season}-{(season+1)%100:02d}\n")
 
     # Cache dirs computed unconditionally (regardless of --skip-schedule-validation
@@ -106,9 +105,7 @@ def main():
     season_games = None
 
     # Step 1: Scrape data
-    print(f"\n{'='*70}")
-    print(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
-    print(f"{'='*70}\n")
+    print_section_header(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
 
     scraper = OddsPortalScraper(headless=args.headless)
     try:
@@ -119,18 +116,14 @@ def main():
 
     if season_games is not None:
         # Step 2: Verify scraped data
-        print(f"\n{'='*70}")
-        print(f"STEP 2: VERIFYING SCRAPED DATA")
-        print(f"{'='*70}")
+        print_section_header("STEP 2: VERIFYING SCRAPED DATA")
 
         verification_results = verify_scraped_data(season_games)
         print_verification_results(season, verification_results)
 
         # Step 2.5: Validate scraped opponents against the authoritative schedule
         if not args.skip_schedule_validation:
-            print(f"\n{'='*70}")
-            print(f"STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
-            print(f"{'='*70}")
+            print_section_header("STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
 
             try:
                 schedule_comparisons = validate_scraped_data_against_schedule(
@@ -143,9 +136,7 @@ def main():
                       f"{season}-{(season+1)%100:02d}. Consider re-running Step 2.5 manually later.")
 
         # Step 3: Prompt for migration
-        print(f"{'='*70}")
-        print(f"STEP 3: MIGRATION TO VERCEL POSTGRES")
-        print(f"{'='*70}\n")
+        print_section_header("STEP 3: MIGRATION TO VERCEL POSTGRES")
 
         response = input(f"Ready to migrate {season}-{(season+1)%100:02d} data to Vercel Postgres? (Y/n): ").strip().upper()
 
@@ -171,9 +162,7 @@ def main():
 
     # Step 4: Update frontend with the new season
     if season_migrated:
-        print(f"\n{'='*70}")
-        print(f"STEP 4: UPDATING FRONTEND SEASONS LIST")
-        print(f"{'='*70}\n")
+        print_section_header("STEP 4: UPDATING FRONTEND SEASONS LIST")
 
         if update_seasons_list(season):
             season_str = f"{season}-{(season+1)%100:02d}"
@@ -187,16 +176,12 @@ def main():
             print(f"ℹ️  Season already exists in frontend, no update needed")
 
     # Step 5: Final verification
-    print(f"\n{'='*70}")
-    print(f"STEP 5: FINAL DATABASE VERIFICATION")
-    print(f"{'='*70}")
+    print_section_header("STEP 5: FINAL DATABASE VERIFICATION")
 
     postgres_results = verify_postgres_migration()
     print_postgres_verification(postgres_results)
 
-    print(f"{'='*70}")
-    print(f"✅ PIPELINE COMPLETE!")
-    print(f"{'='*70}\n")
+    print_section_header("✅ PIPELINE COMPLETE!")
 
 
 if __name__ == "__main__":

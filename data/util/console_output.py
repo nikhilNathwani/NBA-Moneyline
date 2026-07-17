@@ -8,11 +8,16 @@ from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTIO
 from scrape.verification import TeamScheduleComparison
 
 
+def print_section_header(title: str):
+    """Print a bracketed section header - used for every step/result banner throughout the pipeline."""
+    print(f"\n{'='*70}")
+    print(title)
+    print(f"{'='*70}\n")
+
+
 def print_verification_results(season: int, results: Dict):
     """Print scraped data verification results."""
-    print(f"\n{'='*70}")
-    print(f"VERIFICATION RESULTS - {season}-{(season+1)%100:02d} Season")
-    print(f"{'='*70}\n")
+    print_section_header(f"VERIFICATION RESULTS - {season}-{(season+1)%100:02d} Season")
 
     total_ok = results.get('total_games_ok')
     status = "✅" if total_ok else "❌"
@@ -39,9 +44,7 @@ def print_verification_results(season: int, results: Dict):
 
 def print_schedule_validation_results(season: int, comparisons: List[TeamScheduleComparison]):
     """Print the per-team comparison against basketball-reference's authoritative schedule."""
-    print(f"\n{'='*70}")
-    print(f"SCHEDULE VALIDATION vs. basketball-reference - {season}-{(season+1)%100:02d} Season")
-    print(f"{'='*70}\n")
+    print_section_header(f"SCHEDULE VALIDATION vs. basketball-reference - {season}-{(season+1)%100:02d} Season")
 
     mismatched = [c for c in comparisons if not c.ok]
 
@@ -63,9 +66,7 @@ def print_schedule_validation_results(season: int, comparisons: List[TeamSchedul
 
 def print_postgres_verification(results: Dict):
     """Print Postgres database verification results."""
-    print(f"\n{'='*70}")
-    print(f"POSTGRES DATABASE VERIFICATION")
-    print(f"{'='*70}\n")
+    print_section_header("POSTGRES DATABASE VERIFICATION")
     
     if 'error' in results:
         print(f"❌ Error connecting to database: {results['error']}\n")

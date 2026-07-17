@@ -19,7 +19,7 @@ REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits
 MAX_FETCH_ATTEMPTS = 3
 
 
-def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None) -> str:
+def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None) -> tuple:
     """
     Fetch (or read from cache) the season-schedule page HTML for one team.
 
@@ -28,6 +28,9 @@ def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None
         seasonStartYear: calendar year the season started (e.g. 2025 for 2025-26)
         cache_dir: if given, read/write a cached copy at {cache_dir}/{abbr}_{year}.html
                    instead of always hitting the network
+
+    Returns:
+        tuple: (html: str, was_cached: bool)
     """
     season_end_year = seasonStartYear + 1
     cache_path = None
@@ -36,7 +39,7 @@ def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None
         cache_path = os.path.join(cache_dir, f"{abbr}_{season_end_year}.html")
         if os.path.exists(cache_path):
             with open(cache_path, "r", encoding="utf-8") as f:
-                return f.read()
+                return f.read(), True
 
     url = f"https://www.basketball-reference.com/teams/{abbr}/{season_end_year}_games.html"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -59,7 +62,7 @@ def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None
         with open(cache_path, "w", encoding="utf-8") as f:
             f.write(html)
 
-    return html
+    return html, False
 
 
 def fetchAllTeamSchedules(seasonStartYear: int, cache_dir: str = None) -> dict:
@@ -72,10 +75,8 @@ def fetchAllTeamSchedules(seasonStartYear: int, cache_dir: str = None) -> dict:
     """
     html_by_team = {}
     for abbr, full_name in TEAM_ABBR_TO_FULL_NAME.items():
-        was_cached = cache_dir and os.path.exists(
-            os.path.join(cache_dir, f"{abbr}_{seasonStartYear + 1}.html")
-        )
-        html_by_team[full_name] = fetchTeamScheduleHtml(abbr, seasonStartYear, cache_dir=cache_dir)
+        html, was_cached = fetchTeamScheduleHtml(abbr, seasonStartYear, cache_dir=cache_dir)
+        html_by_team[full_name] = html
         if not was_cached:
             time.sleep(REQUEST_DELAY_SECONDS)
     return html_by_team
