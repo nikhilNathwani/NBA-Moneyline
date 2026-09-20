@@ -26,7 +26,7 @@ pytest==9.1.1
 # Managed by pip freeze to ensure consistent versions.
 
 # For beautifulsoup4
-soupsieve==2.8.4
+soupsieve==2.9.0
 typing_extensions==4.15.0
 
 # For selenium
