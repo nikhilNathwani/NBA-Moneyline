@@ -84,6 +84,8 @@ tableau/
 
 ### 1. Install Node dependencies
 
+Requires Node 24 (pinned in `.nvmrc`; fnm switches to it automatically).
+
 ```bash
 npm install
 ```
