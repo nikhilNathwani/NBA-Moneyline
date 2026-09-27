@@ -47,7 +47,7 @@ python3 query_db.py
 cd data
 source .venv/bin/activate
 python3 --version
-pip list
+uv pip list
 ```
 
 **Expected:** Python version shows, packages listed

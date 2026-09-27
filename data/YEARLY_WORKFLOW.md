@@ -196,7 +196,7 @@ Then in Tableau:
 
 ```bash
 cd data
-pip install -r requirements.txt
+uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
 Required packages:

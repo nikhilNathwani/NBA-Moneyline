@@ -9,26 +9,26 @@ Python scripts for scraping NBA moneyline data from OddsPortal.
 ```bash
 cd data
 
-# Create virtual environment
-python3 -m venv .venv
+# Create the virtual environment with uv (uses the Python version in .python-version)
+uv venv --managed-python .venv
+
+# Install dependencies
+uv pip install --python .venv/bin/python -r requirements.txt
 
 # Activate virtual environment
 source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
 ```
 
-**If `.venv/bin/pip` (or pytest, etc.) fails with "cannot execute" / "No such file or directory":**
+**If `.venv/bin/python` (or pytest, etc.) fails with "cannot execute" / "No such file or directory":**
 the venv's wrapper scripts embed an absolute path to this folder at creation time, so moving or
 renaming `data/` (or its parent) breaks them. Recreate it:
 
 ```bash
 cd data
 rm -rf .venv
-python3 -m venv .venv
+uv venv --managed-python .venv
+uv pip install --python .venv/bin/python -r requirements.txt
 source .venv/bin/activate
-pip install -r requirements.txt
 ```
 
 ### Running the Scraper
@@ -61,8 +61,8 @@ See [YEARLY_WORKFLOW.md](YEARLY_WORKFLOW.md) for detailed annual update process.
 ```bash
 cd data
 source .venv/bin/activate
-pip install new-package
-pip freeze > requirements.txt
+uv pip install new-package
+uv pip freeze > requirements.txt
 git add requirements.txt
 git commit -m "Add new-package"
 ```
