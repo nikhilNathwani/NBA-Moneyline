@@ -28,3 +28,8 @@ data/.oddsportal_cache/
 app/queries/sampleQueries.sql
 
 INTERVIEW_STORIES.md
+
+# Environment files hold secrets; only the example template is committed
+.env
+.env.*
+!.env.example
