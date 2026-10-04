@@ -66,6 +66,10 @@ class OddsPortalScraper:
         # so far this season, used to detect pages that rendered a stale/
         # partial loading skeleton instead of the full row set.
         self._max_nonheader_rows_seen = 0
+        # Where rows needing the detail-page fallback get their HTML saved for
+        # debugging - inside the season's page cache, so it's gitignored and
+        # cleaned up along with the cache after a successful migration.
+        self._debug_dir = None
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
     #   SECTION 1: SESSION + AUTOMATION PRIMITIVES    #
@@ -247,7 +251,7 @@ class OddsPortalScraper:
     # that. Kept separate from scrapeGamesFromPage's cache/retry/circuit-
     # breaker orchestration so each has one job: this makes one attempt and
     # judges it; the caller decides how many attempts to allow.
-    def _attemptPageFetch(self, url: str, page_num: int):
+    def _attemptPageFetch(self, url: str, page_num: int, is_last_page: bool = False):
         """
         Returns:
             tuple: (html: str, gameRows: list of eventRow elements) for a
@@ -290,8 +294,11 @@ class OddsPortalScraper:
         # a good page so far this season. A page with far fewer rows
         # than the established norm is likely a stale loading skeleton
         # that happened to be internally consistent (so check 1 alone
-        # wouldn't catch it), not a genuinely quiet day.
-        if self._max_nonheader_rows_seen >= 20 and non_header_rows < 0.5 * self._max_nonheader_rows_seen:
+        # wouldn't catch it), not a genuinely quiet day. Skipped on the last
+        # page, which legitimately holds only the remainder of the season's
+        # games (check 1 and Step 2's game counts still cover it).
+        if (not is_last_page and self._max_nonheader_rows_seen >= 20
+                and non_header_rows < 0.5 * self._max_nonheader_rows_seen):
             raise RuntimeError(
                 f"Page {page_num} has only {non_header_rows} non-header rows, "
                 f"vs. {self._max_nonheader_rows_seen} seen on a prior page this season"
@@ -309,7 +316,8 @@ class OddsPortalScraper:
     # content - the caller uses this to detect a site-wide outage/block
     # rather than silently completing with bad data.
     def scrapeGamesFromPage(self, url: str, page_num: int, seasonStartYear: int, games: Dict[str, List[Game]],
-                             max_attempts: int = 5, cache_dir: Optional[str] = None) -> bool:
+                             max_attempts: int = 5, cache_dir: Optional[str] = None,
+                             is_last_page: bool = False) -> bool:
         # Cache is keyed by page number, mirroring schedules/fetcher.py's
         # per-team cache: lets a re-run (e.g. after OddsPortal rate-limits
         # mid-scrape) skip straight past every page that already rendered
@@ -334,7 +342,7 @@ class OddsPortalScraper:
             html = None
             for attempt in range(1, max_attempts + 1):
                 try:
-                    html, gameRows = self._attemptPageFetch(url, page_num)
+                    html, gameRows = self._attemptPageFetch(url, page_num, is_last_page)
                     succeeded = True
                     break
                 except Exception as e:
@@ -382,12 +390,12 @@ class OddsPortalScraper:
             print(f"  ⚠️  Missing odds for {homeTeamName} vs {awayTeamName}, using fallback...")
 
             # Save the HTML for debugging
-            debug_dir = "/tmp/moneyline_debug"
-            os.makedirs(debug_dir, exist_ok=True)
-            debug_file = os.path.join(debug_dir, f"{homeTeamName}_vs_{awayTeamName}.html")
-            with open(debug_file, 'w') as f:
-                f.write(str(row.prettify()))
-            print(f"  → Saved HTML to {debug_file}")
+            if self._debug_dir:
+                os.makedirs(self._debug_dir, exist_ok=True)
+                debug_file = os.path.join(self._debug_dir, f"{homeTeamName}_vs_{awayTeamName}.html")
+                with open(debug_file, 'w', encoding="utf-8") as f:
+                    f.write(str(row.prettify()))
+                print(f"  → Saved HTML to {debug_file}")
 
             homeWon, awayWon, homeWinOdds, awayWinOdds = self._fetchOddsFromDetailPage(row)
 
@@ -509,6 +517,7 @@ class OddsPortalScraper:
     # where it left off instead of re-scraping every page from scratch.
     def scrapeSeasonSchedule(self, seasonStartYear: int, cache_dir: Optional[str] = None) -> Dict[str, List[Game]]:
         games = {}
+        self._debug_dir = os.path.join(cache_dir, "debug") if cache_dir else None
         urls = self.getSeasonScheduleLinks(seasonStartYear)
 
         total_games_scraped = 0
@@ -521,9 +530,11 @@ class OddsPortalScraper:
             for i, url in enumerate(urls, start=1):
                 print(f"Scraping page {i}/{len(urls)}...")
                 games_before = sum(len(team_games) for team_games in games.values())
-                page_succeeded = self.scrapeGamesFromPage(url, i, seasonStartYear, games, cache_dir=cache_dir)
+                page_succeeded = self.scrapeGamesFromPage(url, i, seasonStartYear, games, cache_dir=cache_dir,
+                                                          is_last_page=(i == len(urls)))
                 games_after = sum(len(team_games) for team_games in games.values())
-                games_on_page = games_after - games_before
+                # Each game is stored twice, once from each team's perspective
+                games_on_page = (games_after - games_before) // 2
                 total_games_scraped += games_on_page
                 print(f"  → {games_on_page} games scraped from page {i}")
 
@@ -552,8 +563,8 @@ class OddsPortalScraper:
 
         print(f"\n{'='*60}")
         print(f"Total games scraped: {total_games_scraped}")
-        print(f"Total game objects (2 per game): {sum(len(team_games) for team_games in games.values())}")
-        print(f"Expected: 2460 games = 4920 game objects")
+        print(f"Total team-game rows (2 per game): {sum(len(team_games) for team_games in games.values())}")
+        print(f"(Step 2 checks these against the expected counts)")
         print(f"{'='*60}\n")
 
         # Fix game numbers (OddsPortal lists games in reverse chronological order)
