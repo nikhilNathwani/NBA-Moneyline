@@ -1,7 +1,7 @@
 """
-Parses basketball-reference season-schedule HTML into an ordered list of
-regular-season opponents, with in-season-tournament (IST) knockout games
-and play-in games excluded.
+Parses basketball-reference season-schedule HTML into a team's ordered list
+of true regular-season games (date, opponent, home/away, result), with
+in-season-tournament (IST) knockout games and play-in games excluded.
 
 Pure parsing/filtering logic, no network access, so it can be unit tested
 against saved HTML fixtures.
@@ -22,12 +22,18 @@ IST_NOTE_TEXTS = {"In-Season Tournament", "NBA Cup"}
 PLAY_IN_NOTE_TEXT = "Play-In Game"
 
 
+# basketball-reference's game_location values
+HOME, AWAY, NEUTRAL = "", "@", "N"
+
+
 @dataclass
 class ScheduleGame:
     game_number: int
     date: str
     opponent: str
     note: str
+    location: str = HOME  # HOME, AWAY or NEUTRAL (both teams "N" - e.g. games abroad)
+    result: str = ""      # "W" or "L", from this team's side
 
 
 def parseScheduleTable(html: str) -> List[ScheduleGame]:
@@ -49,14 +55,21 @@ def parseScheduleTable(html: str) -> List[ScheduleGame]:
             date=cells[0].get_text(strip=True),
             opponent=cells[5].get_text(strip=True),
             note=cells[-1].get_text(strip=True),
+            location=row.find("td", {"data-stat": "game_location"}).get_text(strip=True),
+            result=row.find("td", {"data-stat": "game_result"}).get_text(strip=True),
         ))
     return games
 
 
 def getTrueRegularSeasonOpponents(games: List[ScheduleGame]) -> List[str]:
+    """The ordered opponent list for a team's true regular season (see below)."""
+    return [game.opponent for game in getTrueRegularSeasonGames(games)]
+
+
+def getTrueRegularSeasonGames(games: List[ScheduleGame]) -> List[ScheduleGame]:
     """
-    Return the ordered opponent list for a team's "true" regular season,
-    excluding play-in games and IST knockout-round games.
+    Return a team's "true" regular-season games in order, excluding play-in
+    games and IST knockout-round games.
 
     IST knockout games are detected dynamically rather than by hardcoded
     date: every team plays exactly IST_GROUP_STAGE_GAME_COUNT group-stage
@@ -67,7 +80,7 @@ def getTrueRegularSeasonOpponents(games: List[ScheduleGame]) -> List[str]:
     specific knockout dates hardcoded.
     """
     ist_games_seen = 0
-    true_opponents = []
+    true_games = []
     for game in games:
         if game.note == PLAY_IN_NOTE_TEXT:
             continue
@@ -75,5 +88,5 @@ def getTrueRegularSeasonOpponents(games: List[ScheduleGame]) -> List[str]:
             ist_games_seen += 1
             if ist_games_seen > IST_GROUP_STAGE_GAME_COUNT:
                 continue  # knockout-round game, excluded from our dataset
-        true_opponents.append(game.opponent)
-    return true_opponents
+        true_games.append(game)
+    return true_games

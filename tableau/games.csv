@@ -736,10 +736,10 @@ Atlanta Hawks,2025,23,false,-125,110
 Atlanta Hawks,2025,24,false,136,-159
 Atlanta Hawks,2025,25,true,-400,340
 Atlanta Hawks,2025,26,false,235,-278
-Atlanta Hawks,2025,27,false,-185,154
-Atlanta Hawks,2025,28,false,145,-159
-Atlanta Hawks,2025,29,false,-169,148
-Atlanta Hawks,2025,30,true,-179,164
+Atlanta Hawks,2025,27,true,-179,164
+Atlanta Hawks,2025,28,false,-185,154
+Atlanta Hawks,2025,29,false,145,-159
+Atlanta Hawks,2025,30,false,-169,148
 Atlanta Hawks,2025,31,false,-154,129
 Atlanta Hawks,2025,32,false,-149,134
 Atlanta Hawks,2025,33,false,185,-208
@@ -757,9 +757,9 @@ Atlanta Hawks,2025,44,false,140,-159
 Atlanta Hawks,2025,45,false,-116,100
 Atlanta Hawks,2025,46,true,104,-120
 Atlanta Hawks,2025,47,true,125,-145
-Atlanta Hawks,2025,48,true,172,-200
-Atlanta Hawks,2025,49,false,225,-250
-Atlanta Hawks,2025,50,true,-208,179
+Atlanta Hawks,2025,48,true,-208,179
+Atlanta Hawks,2025,49,true,172,-200
+Atlanta Hawks,2025,50,false,225,-250
 Atlanta Hawks,2025,51,false,-118,104
 Atlanta Hawks,2025,52,true,100,-110
 Atlanta Hawks,2025,53,true,-294,250
@@ -1527,8 +1527,8 @@ Boston Celtics,2025,15,true,-588,425
 Boston Celtics,2025,16,false,-909,600
 Boston Celtics,2025,17,true,-185,154
 Boston Celtics,2025,18,true,110,-128
-Boston Celtics,2025,19,true,240,-294
-Boston Celtics,2025,20,false,194,-233
+Boston Celtics,2025,19,false,194,-233
+Boston Celtics,2025,20,true,240,-294
 Boston Celtics,2025,21,true,100,-115
 Boston Celtics,2025,22,true,-455,375
 Boston Celtics,2025,23,true,-333,280
@@ -6356,9 +6356,9 @@ Denver Nuggets,2025,62,true,-588,459
 Denver Nuggets,2025,63,true,-169,152
 Denver Nuggets,2025,64,false,-110,102
 Denver Nuggets,2025,65,false,140,-154
-Denver Nuggets,2025,66,true,140,-156
-Denver Nuggets,2025,67,false,-120,110
-Denver Nuggets,2025,68,true,-250,215
+Denver Nuggets,2025,66,true,-250,215
+Denver Nuggets,2025,67,true,140,-156
+Denver Nuggets,2025,68,false,-120,110
 Denver Nuggets,2025,69,true,-1250,830
 Denver Nuggets,2025,70,false,-769,575
 Denver Nuggets,2025,71,true,-270,220
@@ -8739,8 +8739,8 @@ Houston Rockets,2025,61,false,-400,330
 Houston Rockets,2025,62,true,-263,220
 Houston Rockets,2025,63,false,198,-227
 Houston Rockets,2025,64,true,-189,166
-Houston Rockets,2025,65,true,-222,190
-Houston Rockets,2025,66,false,215,-250
+Houston Rockets,2025,65,false,215,-250
+Houston Rockets,2025,66,true,-222,190
 Houston Rockets,2025,67,false,100,-116
 Houston Rockets,2025,68,false,-130,110
 Houston Rockets,2025,69,true,-145,125
@@ -9520,8 +9520,8 @@ Indiana Pacers,2025,43,false,675,-909
 Indiana Pacers,2025,44,false,220,-250
 Indiana Pacers,2025,45,false,350,-455
 Indiana Pacers,2025,46,true,700,-909
-Indiana Pacers,2025,47,true,110,-125
-Indiana Pacers,2025,48,false,179,-208
+Indiana Pacers,2025,47,false,179,-208
+Indiana Pacers,2025,48,true,110,-125
 Indiana Pacers,2025,49,true,104,-118
 Indiana Pacers,2025,50,false,210,-250
 Indiana Pacers,2025,51,false,125,-147
@@ -14278,8 +14278,8 @@ Minnesota Timberwolves,2025,15,true,-1250,950
 Minnesota Timberwolves,2025,16,false,-185,154
 Minnesota Timberwolves,2025,17,false,-455,359
 Minnesota Timberwolves,2025,18,false,375,-500
-Minnesota Timberwolves,2025,19,true,-185,160
-Minnesota Timberwolves,2025,20,true,-233,194
+Minnesota Timberwolves,2025,19,true,-233,194
+Minnesota Timberwolves,2025,20,true,-185,160
 Minnesota Timberwolves,2025,21,true,-667,500
 Minnesota Timberwolves,2025,22,true,-588,450
 Minnesota Timberwolves,2025,23,true,-345,300
@@ -18267,9 +18267,9 @@ Philadelphia 76ers,2025,21,true,-172,150
 Philadelphia 76ers,2025,22,true,-115,102
 Philadelphia 76ers,2025,23,false,124,-141
 Philadelphia 76ers,2025,24,true,-227,188
-Philadelphia 76ers,2025,25,true,210,-250
-Philadelphia 76ers,2025,26,true,-116,100
-Philadelphia 76ers,2025,27,false,164,-179
+Philadelphia 76ers,2025,25,false,164,-179
+Philadelphia 76ers,2025,26,true,210,-250
+Philadelphia 76ers,2025,27,true,-116,100
 Philadelphia 76ers,2025,28,false,-370,320
 Philadelphia 76ers,2025,29,false,-125,116
 Philadelphia 76ers,2025,30,false,610,-769
@@ -19880,8 +19880,8 @@ Portland Trail Blazers,2025,33,true,-139,120
 Portland Trail Blazers,2025,34,false,675,-1000
 Portland Trail Blazers,2025,35,true,-159,138
 Portland Trail Blazers,2025,36,true,260,-323
-Portland Trail Blazers,2025,37,true,225,-270
-Portland Trail Blazers,2025,38,true,-227,188
+Portland Trail Blazers,2025,37,true,-227,188
+Portland Trail Blazers,2025,38,true,225,-270
 Portland Trail Blazers,2025,39,true,204,-250
 Portland Trail Blazers,2025,40,false,184,-222
 Portland Trail Blazers,2025,41,false,380,-455
@@ -23073,9 +23073,9 @@ Utah Jazz,2025,31,true,570,-769
 Utah Jazz,2025,32,false,245,-278
 Utah Jazz,2025,33,false,600,-833
 Utah Jazz,2025,34,false,440,-588
-Utah Jazz,2025,35,false,950,-1111
-Utah Jazz,2025,36,true,160,-189
-Utah Jazz,2025,37,false,188,-227
+Utah Jazz,2025,35,false,188,-227
+Utah Jazz,2025,36,false,950,-1111
+Utah Jazz,2025,37,true,160,-189
 Utah Jazz,2025,38,false,185,-208
 Utah Jazz,2025,39,true,450,-556
 Utah Jazz,2025,40,false,185,-213

@@ -7,11 +7,11 @@ to migrate to production, two ways:
   - fast, no network access.
 - validate_scraped_data_against_schedule: per-team, per-opponent game
   counts against basketball-reference's authoritative schedule. Comparison
-  is order-agnostic (multiset of opponents, not sequence): OddsPortal and
-  basketball-reference can legitimately disagree on a game's exact
-  chronological position in the odd case where the game was postponed and
-  replayed on a different date, so we only check *which* opponents (and
-  how many times each) a team played, not what order they appear in.
+  is order-agnostic (multiset of opponents, not sequence): OddsPortal's
+  listing order doesn't always match the real date order (in 2025-26 it
+  listed five games a few places late), so this checks only *which*
+  opponents (and how many times each) a team played. validate/matching.py
+  then places every game on its real date.
 
 Both work directly on the scraper's in-memory output - there's no
 intermediate storage to verify against.
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from validate.schedules.fetcher import fetchAllTeamSchedules
-from validate.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from validate.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
 from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 
@@ -110,25 +110,31 @@ def compare_opponent_multisets(true_opponents: List[str], scraped_opponents: Lis
     }
 
 
-def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]], season: int,
-                                            cache_dir: Optional[str] = None) -> List[TeamScheduleComparison]:
+def load_true_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
     """
-    Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (IST knockout and play-in games excluded).
+    Every team's true regular-season games from basketball-reference (IST
+    knockout and play-in games excluded), as {team_full_name: games in order}.
+    The only network access in validate/; everything else here is pure.
 
     Args:
-        team_games: scraped games straight from the scraper's output
         season: seasonStartYear (e.g. 2025 for the 2025-26 season)
         cache_dir: optional directory to cache fetched schedule HTML in,
-                   so repeated runs (e.g. during development) don't
-                   re-fetch from basketball-reference every time
+                   so a re-run doesn't re-fetch from basketball-reference
     """
     html_by_team = fetchAllTeamSchedules(season, cache_dir=cache_dir)
+    return {team: getTrueRegularSeasonGames(parseScheduleTable(html))
+            for team, html in html_by_team.items()}
 
+
+def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]],
+                                            schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
+    """
+    Compare every team's scraped opponents against basketball-reference's
+    authoritative schedule (from load_true_schedules).
+    """
     results = []
-    for team_full_name, html in html_by_team.items():
-        games = parseScheduleTable(html)
-        true_opponents = getTrueRegularSeasonOpponents(games)
+    for team_full_name, true_games in schedules.items():
+        true_opponents = [g.opponent for g in true_games]
         scraped_opponents = [g.opponent for g in team_games.get(team_full_name, [])]
 
         diff = compare_opponent_multisets(true_opponents, scraped_opponents)

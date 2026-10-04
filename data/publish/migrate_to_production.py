@@ -1,7 +1,11 @@
 """
 Publishes verified games to the production database (Postgres) that the
 web app reads from - migrates them over (Step 3) and verifies the
-migration (Steps 5-6).
+migration (Step 5).
+
+Writes one row per real game to the `games` table; the web app and the
+Tableau export read the `team_games` view, which presents each game from
+both teams' sides. See data/README.md, "The database".
 """
 
 import os
@@ -10,7 +14,7 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from typing import Dict, List
 
-from util.game import Game
+from validate.matching import GameRecord
 from util.paths import PROJECT_ROOT
 
 
@@ -26,7 +30,7 @@ def verify_postgres_migration() -> Dict:
     Verify data in Postgres database.
 
     Returns dict with:
-        - season_counts: list of (season, count) tuples
+        - season_counts: list of (season, number of games) tuples
         - error: str (if connection failed)
     """
     try:
@@ -50,23 +54,18 @@ def verify_postgres_migration() -> Dict:
 
 # Whole-season checks run inside the migration transaction, after the
 # inserts: each query returns a count of problems (0 = pass). These span many
-# rows, so they can't be table constraints like the per-row rules on the games
-# table (see data/README.md).
+# rows, so they can't be table constraints like the per-row rules on games.
 SEASON_CHECKS = {
     "the season doesn't have exactly 30 teams": """
-        SELECT ABS(COUNT(DISTINCT team) - 30) FROM games WHERE seasonstartyear = %(season)s
+        SELECT ABS(COUNT(DISTINCT team) - 30) FROM team_games WHERE seasonstartyear = %(season)s
     """,
-    # Every game has one winner row and one loser row
-    "wins don't equal losses": """
-        SELECT ABS(COUNT(*) FILTER (WHERE outcome) - COUNT(*) FILTER (WHERE NOT outcome))
-        FROM games WHERE seasonstartyear = %(season)s
-    """,
-    # With the primary key ruling out repeats, max = count means exactly 1..N
-    "some team's game numbers aren't 1..N with no gaps": """
+    # The table's UNIQUE constraints stop a team being home twice (or away
+    # twice) on one date; this catches home in one game and away in another
+    "some team plays twice on the same date": """
         SELECT COUNT(*) FROM (
-            SELECT team FROM games WHERE seasonstartyear = %(season)s
-            GROUP BY team HAVING MIN(gamenumber) <> 1 OR MAX(gamenumber) <> COUNT(*)
-        ) gaps
+            SELECT team FROM team_games WHERE seasonstartyear = %(season)s
+            GROUP BY team, game_date HAVING COUNT(*) > 1
+        ) doubled
     """,
 }
 
@@ -82,44 +81,46 @@ def _check_season(cursor, season: int):
         raise ValueError(f"season checks failed: {'; '.join(failures)}")
 
 
-def migrate_season_to_postgres(team_games: Dict[str, List[Game]], season: int) -> int:
+def migrate_season_to_postgres(records: List[GameRecord], season: int) -> int:
     """
-    Migrate a season's scraped games to Postgres.
+    Migrate a season's games (from validate.matching) to Postgres.
 
     Args:
-        team_games: scraped games straight from the scraper's output
+        records: one GameRecord per real game
         season: Season start year to migrate
 
     All-or-nothing: the delete, every insert and the whole-season checks run
     in one transaction, so any error or failed check rolls the whole season
     back and leaves production exactly as it was (never the old season plus
-    part of the new one). The table's own constraints reject
-    bad individual rows the same way.
+    part of the new one). The tables' own constraints reject bad individual
+    rows the same way - including any team name not in the teams table.
 
     Returns:
-        Number of team-game rows inserted (2 per game)
+        Number of games inserted
     """
-    rows = [
-        (team, season, game.gameNumber, game.outcome, game.winOdds, game.loseOdds)
-        for team, games in sorted(team_games.items())
-        for game in games
-    ]
-
     pg_conn = get_postgres_connection()
     try:
         # `with pg_conn` commits on success and rolls back on any exception
         # (it doesn't close the connection - the finally below does that).
         with pg_conn, pg_conn.cursor() as pg_cursor:
+            pg_cursor.execute("SELECT name, team_id FROM teams")
+            team_ids = dict(pg_cursor.fetchall())
+            unknown = sorted({t for r in records for t in (r.home, r.away)} - team_ids.keys())
+            if unknown:
+                raise ValueError(f"teams not in the teams table: {', '.join(unknown)}")
+
             pg_cursor.execute("DELETE FROM games WHERE seasonstartyear = %s", (season,))
-            print(f"  Deleting {pg_cursor.rowcount} existing rows for {season}-{(season+1)%100:02d} season")
+            print(f"  Deleting {pg_cursor.rowcount} existing games for {season}-{(season+1)%100:02d} season")
 
             execute_values(pg_cursor, """
-                INSERT INTO games (team, seasonstartyear, gamenumber, outcome, winodds, loseodds)
+                INSERT INTO games (seasonstartyear, game_date, home_team_id, away_team_id,
+                                   neutral_site, home_won, home_odds, away_odds)
                 VALUES %s
-            """, rows)
+            """, [(season, r.game_date, team_ids[r.home], team_ids[r.away], r.neutral_site,
+                   r.home_won, r.home_odds, r.away_odds) for r in records])
 
             _check_season(pg_cursor, season)
     finally:
         pg_conn.close()
 
-    return len(rows)
+    return len(records)

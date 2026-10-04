@@ -23,6 +23,8 @@ OUTPUT = os.path.join(ROOT, "tableau", "games.csv")
 
 # Column aliases and row order here define the exact shape of games.csv the
 # workbook expects - don't change without re-checking the Tableau connection.
+# Reads the team_games view: each game from both teams' sides, as the
+# dashboard uses it.
 QUERY = """
     SELECT
         team            AS "Team",
@@ -31,7 +33,7 @@ QUERY = """
         outcome::text   AS "Outcome",
         winodds         AS "Win Odds",
         loseodds        AS "Lose Odds"
-    FROM games
+    FROM team_games
     ORDER BY team, seasonstartyear, gamenumber
 """
 
