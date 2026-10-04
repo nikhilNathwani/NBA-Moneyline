@@ -19,11 +19,15 @@ data/
                    list, export the CSV that Tableau reads
   util/            Shared pieces: the Game record, expected game counts per
                    season (constants.py), console output
-  schema.sql       The production `games` table and its constraints
   tests/           The pytest suite - checks the *code*, never runs during the
                    pipeline. Mirrors the folders above (tests/scrape/,
                    tests/validate/, tests/publish/)
+  .python-version  The Python version the venv is built with (read by uv)
+  pytest.ini       Lets tests import the code the way main.py does
 ```
+
+(`.python-version` and `pytest.ini` are hidden in this project's VS Code sidebar;
+they're set-and-forget.)
 
 `validate/` vs. `tests/`: `validate/` is part of the pipeline and checks each
 season's *data* every run; `tests/` checks that the code itself works.
@@ -135,7 +139,8 @@ The migration deletes the season's existing rows, inserts the new ones (odds as
 plain integers like `150` / `-200`; the web app adds the `+` for display), then
 checks the whole season: 30 teams, wins = losses, each team's game numbers 1..N with
 no gaps. It's all one transaction, so any failure leaves production exactly as it
-was, and the table's constraints (`schema.sql`) reject bad rows the same way.
+was, and the table's own constraints (see [The `games` table](#the-games-table))
+reject bad rows the same way.
 Re-running a season is safe.
 
 ### Step 4: Update the web app
@@ -187,8 +192,44 @@ cd data && source .venv/bin/activate && pytest
 
 Runs the parsing and checking logic against saved pages (no network access) -
 worth running after any scraper change. The migration tests start a throwaway
-local Postgres built from `schema.sql` (never production), and are skipped if
-Postgres isn't installed.
+local Postgres and copy the `games` table's current definition from production
+into it (production is only read, never written), so they always test against
+the real columns and constraints. They're skipped if Postgres isn't installed
+locally or production can't be reached.
+
+## The `games` table
+
+*As of 2026-10-04. The database itself is the source of truth (the migration tests
+read its definition live); update this section when you change the table.*
+
+The one production table: written by the pipeline, read by the web app
+(`app/queries/`) and the Tableau export. One row per team per game, so every game
+appears twice, once from each team's side.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `team` | varchar(255) | the team this row is about |
+| `seasonstartyear` | integer | year the season started (2025 = 2025-26) |
+| `gamenumber` | integer | the team's Nth game of the season, in date order |
+| `outcome` | boolean | true if `team` won |
+| `winodds` | integer | American moneyline odds on `team` winning (e.g. 150, -200) |
+| `loseodds` | integer | odds on `team` losing (= the opponent's `winodds`) |
+
+All columns are NOT NULL. Constraints:
+
+-   `games_pkey`: primary key on (`team`, `seasonstartyear`, `gamenumber`)
+-   `games_gamenumber_range`: `gamenumber` between 1 and 82
+-   `games_winodds_american`, `games_loseodds_american`: odds are -100 or below, or
+    100 or above (valid American odds)
+
+Whole-season rules (30 teams, wins = losses, game numbers 1..N with no gaps) span
+many rows, so they're checked by the migration instead
+(`publish/migrate_to_production.py`).
+
+History: on 2026-10-04 the odds columns changed from text (`"+150"`) to integer and
+the constraints were added; before that the table had none. The web app still
+reads this table live, so for any structural change, deploy app code that works
+with both the old and new structure first, then change the table.
 
 ## Troubleshooting
 

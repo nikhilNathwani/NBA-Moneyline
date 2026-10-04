@@ -50,7 +50,8 @@ def verify_postgres_migration() -> Dict:
 
 # Whole-season checks run inside the migration transaction, after the
 # inserts: each query returns a count of problems (0 = pass). These span many
-# rows, so they can't be table constraints like the per-row rules in schema.sql.
+# rows, so they can't be table constraints like the per-row rules on the games
+# table (see data/README.md).
 SEASON_CHECKS = {
     "the season doesn't have exactly 30 teams": """
         SELECT ABS(COUNT(DISTINCT team) - 30) FROM games WHERE seasonstartyear = %(season)s
@@ -92,7 +93,7 @@ def migrate_season_to_postgres(team_games: Dict[str, List[Game]], season: int) -
     All-or-nothing: the delete, every insert and the whole-season checks run
     in one transaction, so any error or failed check rolls the whole season
     back and leaves production exactly as it was (never the old season plus
-    part of the new one). The table's own constraints (schema.sql) reject
+    part of the new one). The table's own constraints reject
     bad individual rows the same way.
 
     Returns:

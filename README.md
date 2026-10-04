@@ -66,7 +66,6 @@ data/
   publish/                    # Steps 3-5: migrate to production, update frontend
   util/                       # Shared data model, constants, and output formatting
   tests/                      # pytest suite (parsing, validation, migration)
-  schema.sql                  # The production games table and its constraints
   README.md                   # Setup, the yearly run, troubleshooting
 
 tableau/
@@ -125,7 +124,7 @@ The `data/` directory contains the yearly ingestion flow:
 2. Verify game counts against that season's expected pattern, and every team's
    opponents against basketball-reference's schedule
 3. Migrate into PostgreSQL in one all-or-nothing transaction (only with all checks
-   passing, or an explicit override); the table's constraints (`data/schema.sql`)
+   passing, or an explicit override); the table's own constraints
    reject bad rows too
 4. Update frontend season options
 

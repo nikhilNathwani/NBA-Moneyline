@@ -1,14 +1,17 @@
 """
 Tests for publish.migrate_to_production against a real, throwaway Postgres
-server (never the production database): the table is built from
-data/schema.sql, so the real constraints are exercised too.
+server. Migrations only ever write to that throwaway server; production is
+only *read*, once, for the `games` table's current definition (columns and
+constraints), so the test table always matches the real one and the real
+constraints are exercised too.
 
 The point is the all-or-nothing guarantee - a successful migration replaces
 exactly one season, and any failure (a bad row, a duplicate, a failed
 whole-season check) leaves the table exactly as it was.
 
 Skipped when no local Postgres install is found (initdb on PATH, or
-Postgres.app on macOS).
+Postgres.app on macOS), or when production can't be reached (no
+POSTGRES_URL in .env.development.local, or no network).
 """
 
 import os
@@ -23,8 +26,41 @@ import pytest
 import publish.migrate_to_production as migration
 from util.game import Game
 
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "schema.sql")
 POSTGRES_APP_BIN = "/Applications/Postgres.app/Contents/Versions/latest/bin"
+
+
+# Captured before any test points get_postgres_connection at the throwaway server
+_connect_to_production = migration.get_postgres_connection
+
+
+@pytest.fixture(scope="module")
+def games_table_ddl():
+    """CREATE TABLE for `games`, rebuilt from production's catalog (read-only)."""
+    try:
+        conn = _connect_to_production()
+    except Exception as e:
+        pytest.skip(f"can't read the games table definition from production ({e.__class__.__name__})")
+    try:
+        conn.set_session(readonly=True)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT attname, format_type(atttypid, atttypmod), attnotnull
+            FROM pg_attribute
+            WHERE attrelid = 'public.games'::regclass AND attnum > 0 AND NOT attisdropped
+            ORDER BY attnum
+        """)
+        columns = [f"{name} {type_}{' NOT NULL' if not_null else ''}"
+                   for name, type_, not_null in cursor.fetchall()]
+        cursor.execute("""
+            SELECT conname, pg_get_constraintdef(oid)
+            FROM pg_constraint
+            WHERE conrelid = 'public.games'::regclass
+            ORDER BY conname
+        """)
+        constraints = [f"CONSTRAINT {name} {definition}" for name, definition in cursor.fetchall()]
+    finally:
+        conn.close()
+    return f"CREATE TABLE games ({', '.join(columns + constraints)})"
 
 
 def _find_postgres_bin():
@@ -66,14 +102,13 @@ def postgres_dsn():
 
 
 @pytest.fixture
-def db(postgres_dsn, monkeypatch):
-    """A fresh `games` table built from schema.sql, with migrations pointed at it."""
+def db(postgres_dsn, games_table_ddl, monkeypatch):
+    """A fresh `games` table matching production's, with migrations pointed at it."""
     conn = psycopg2.connect(postgres_dsn)
     conn.autocommit = True
     cursor = conn.cursor()
     cursor.execute("DROP TABLE IF EXISTS games")
-    with open(SCHEMA_PATH, encoding="utf-8") as f:
-        cursor.execute(f.read())
+    cursor.execute(games_table_ddl)
     monkeypatch.setattr(migration, "get_postgres_connection", lambda: psycopg2.connect(postgres_dsn))
     yield cursor
     conn.close()
