@@ -4,7 +4,7 @@ Console output formatting utilities for the NBA Moneyline data pipeline.
 
 from typing import Dict, List
 
-from scrape.verification import TeamScheduleComparison
+from validate.verification import TeamScheduleComparison
 
 
 def print_section_header(title: str):

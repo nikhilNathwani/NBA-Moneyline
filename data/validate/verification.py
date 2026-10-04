@@ -21,8 +21,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from scrape.schedules.fetcher import fetchAllTeamSchedules
-from scrape.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from validate.schedules.fetcher import fetchAllTeamSchedules
+from validate.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
 from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 

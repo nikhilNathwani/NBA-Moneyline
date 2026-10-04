@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.request
 
-from scrape.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
+from validate.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
 REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits

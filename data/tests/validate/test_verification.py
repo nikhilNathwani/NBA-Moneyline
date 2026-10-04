@@ -1,12 +1,12 @@
 """
-Tests for the pure logic in scrape.verification: the opponent comparison and
+Tests for the pure logic in validate.verification: the opponent comparison and
 the season-aware game-count check.
 
 These use synthetic data (no network, no fixtures) since both are pure
 functions.
 """
 
-from scrape.verification import compare_opponent_multisets, verify_scraped_data
+from validate.verification import compare_opponent_multisets, verify_scraped_data
 from util.game import Game
 
 

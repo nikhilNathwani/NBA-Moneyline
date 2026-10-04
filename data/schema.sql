@@ -10,7 +10,7 @@
 -- also runs whole-season checks (30 teams, wins = losses, game numbers 1..N
 -- with no gaps) inside its transaction, since those span many rows.
 --
--- The rollback test (test/publish/test_migration.py) builds its table from
+-- The rollback test (tests/publish/test_migration.py) builds its table from
 -- this file, so keep it in sync with production.
 --
 -- History:
