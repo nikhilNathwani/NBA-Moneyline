@@ -14,27 +14,19 @@
 --      LAL  |      2023       |  false  |    true     |  100  |    18     |      -1800
 --      LAL  |      2023       |  false  |    false    |  100  |    10     |      -1000
 
-WITH integer_odds AS (
+WITH label_favorites AS (
 	SELECT 
 		team,
 		seasonStartYear,
 		outcome,
+		winOdds,
+		loseOdds,
+		winOdds < 0 AS is_favorite,
 		CAST($3 AS boolean) as prediction,
-		CAST($4 AS NUMERIC) AS wager,
-		CAST(winOdds AS INTEGER) AS winOdds_int,
-		CAST(loseOdds AS INTEGER) AS loseOdds_int
+		CAST($4 AS NUMERIC) AS wager
 		FROM games
 		WHERE seasonStartYear = CAST($1 AS integer)
 			AND team = CAST($2 AS text)
-),
-label_favorites AS (
-	SELECT 
-		*,
-		CASE 
-			WHEN winOdds_int < 0 THEN TRUE
-			ELSE FALSE
-			END AS is_favorite
-		FROM integer_odds
 ),
 odds_of_prediction AS (
 	SELECT 
@@ -45,8 +37,8 @@ odds_of_prediction AS (
 		prediction,
 		wager,
 		CASE 
-			WHEN prediction = TRUE THEN winOdds_int
-			ELSE loseOdds_int
+			WHEN prediction = TRUE THEN winOdds
+			ELSE loseOdds
 		END AS odds
 		FROM label_favorites
 ),
