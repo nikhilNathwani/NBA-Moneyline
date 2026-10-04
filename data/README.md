@@ -8,23 +8,26 @@ the Tableau dashboard read. It runs once a year, after a regular season ends.
 
 ```
 data/
-  main.py          The whole pipeline, steps 1-5 in order - start here
-  scrape/odds/     Step 1: scrape OddsPortal (Selenium) and turn each game into
-                   two team rows (scraper.py drives the browser; parser.py is
-                   the pure HTML parsing)
-  validate/        Steps 2-2.5: check the scraped data before it's trusted
-                   (verification.py), against basketball-reference's schedule
-                   (schedules/), and match every game to its real date there
-                   (matching.py)
-  publish/         Steps 3-5: migrate to Postgres, update the web app's season
-                   list, export the CSV that Tableau reads
-  util/            Shared pieces: the Game record, expected game counts per
-                   season (constants.py), console output
-  tests/           The pytest suite - checks the *code*, never runs during the
-                   pipeline. Mirrors the folders above (tests/scrape/,
-                   tests/validate/, tests/publish/)
-  .python-version  The Python version the venv is built with (read by uv)
-  pytest.ini       Lets tests import the code the way main.py does
+  main.py           The whole pipeline, steps 1-6 in order - start here
+  scrape/           Step 1: get the season from both sources
+    odds/             OddsPortal: odds and results, two rows per game
+                      (scraper.py drives the browser; parser.py is the pure
+                      HTML parsing)
+    schedules/        basketball-reference: the official schedule - dates,
+                      home/away (fetcher.py downloads, parser.py parses)
+  validate/         Step 2: check the scraped data against expectations and the
+                    official schedule (verification.py)
+  standardize/      Step 3: turn the two rows per game into one record per real
+                    game, dated from the official schedule (matching.py)
+  publish/          Steps 4-6: migrate to Postgres, update the web app's season
+                    list, final check; plus the Tableau CSV export
+  util/             Shared pieces: the Game record, expected game counts per
+                    season (constants.py), console output
+  tests/            The pytest suite - checks the *code*, never runs during the
+                    pipeline. Mirrors the folders above
+  sample_queries.sql  Handy SQL for inspecting the database by hand
+  .python-version   The Python version the venv is built with (read by uv)
+  pytest.ini        Lets tests import the code the way main.py does
 ```
 
 (`.python-version` and `pytest.ini` are hidden in this project's VS Code sidebar;
@@ -32,6 +35,9 @@ they're set-and-forget.)
 
 `validate/` vs. `tests/`: `validate/` is part of the pipeline and checks each
 season's *data* every run; `tests/` checks that the code itself works.
+
+To poke at the database by hand, `sample_queries.sql` has ready-made queries
+(seasons, a team's season, records against each opponent, structure, sizes).
 
 ## One-time setup
 
@@ -72,16 +78,22 @@ python3 main.py --season 2025 --headless # same, without a visible browser windo
 One season per run, by design: catching up after a gap means one run per season
 (see the note at the top of `main.py` for why). Other options: `python3 main.py --help`.
 
-### Step 1: Scrape
+### Step 1: Scrape both sources
 
-Opens Chrome on OddsPortal's NBA results pages and scrapes every game of the
-season into memory. Each page is checked for being fully loaded, retried up to 5
-times if not, and cached once it passes (see "scrape aborted mid-run" below).
+-   **OddsPortal**: opens Chrome on its NBA results pages and scrapes every game of
+    the season into memory, two rows per game (one per team). Each page is checked
+    for being fully loaded, retried up to 5 times if not, and cached once it passes
+    (see "scrape aborted mid-run" below).
+-   **basketball-reference**: downloads every team's official schedule (play-in and
+    tournament knockout games excluded) - the source of each game's date and home
+    team, and what Step 2 checks opponents against. This needs network access to
+    basketball-reference.com: without it the season can't be migrated, since the
+    database needs each game's date.
 
-### Step 2: Check game counts
+### Step 2: Validate
 
-Compares each team's game count with that season's expected pattern
-(`util/constants.py`), and prints an explicit pass/fail:
+First, each team's game count against that season's expected pattern
+(`util/constants.py`), with an explicit pass/fail:
 
 ```
 ✅ Total team-game rows scraped: 2448 (expected 2448; 2 per game)
@@ -99,22 +111,23 @@ Compares each team's game count with that season's expected pattern
     losers on 81. Which teams is detected each season, not hardcoded.
 -   Older seasons are checked against their own format: all 30 at 82 before
     2023-24, all 30 at 72 in 2020-21. 2019-20 (the COVID bubble) has no fixed
-    pattern, so this step just prints the counts and Step 2.5 is the check.
+    pattern, so the count check doesn't apply and the opponent check below is the
+    check.
 
-### Step 2.5: Check against basketball-reference
-
-Compares every team's scraped opponents with basketball-reference.com's official
-schedule (play-in and tournament knockout games excluded):
+Then every team's scraped opponents against the official schedule:
 
 ```
 ✅ All 30 teams' scraped opponents match the authoritative schedule
 ```
 
 A mismatch lists the exact missing/extra opponents for that team. This
-comparison ignores order; the matching step below handles order.
+comparison ignores order; Step 3 handles order.
 
-Then every game is matched to its entry on basketball-reference's schedule, which
-gives it its real date and home team (`validate/matching.py`):
+### Step 3: Standardize
+
+Every game is matched to its entry on basketball-reference's schedule, which turns
+the scraper's two rows into one record with the game's real date and home team
+(`standardize/matching.py`):
 
 ```
 📅 Matched all 1224 games to their dates on basketball-reference
@@ -126,10 +139,7 @@ out of date order (it did for 2025-26) still match, and their game numbers come
 from the real dates. If any game can't be matched to exactly one pair of rows, it
 says which, and the season can't be migrated - nothing is guessed.
 
-This step needs network access to basketball-reference.com: the database needs
-each game's date, and this is where dates come from.
-
-### Step 3: Confirm and migrate
+### Step 4: Confirm and migrate
 
 If every check passed:
 
@@ -159,13 +169,13 @@ twice on one date. It's all one transaction, so any failure leaves production
 exactly as it was, and the tables' own constraints (see [The database](#the-database))
 reject bad rows the same way. Re-running a season is safe.
 
-### Step 4: Update the web app
+### Step 5: Update the web app
 
 Adds the season to the web app's dropdown (`public/js/view/renderFilters.js`),
 then commits and pushes ("Add 2025-26 season to web app"), which deploys it on
 Vercel.
 
-### Step 5: Final database check
+### Step 6: Final database check
 
 ```
 📊 Games Per Season in Database:
@@ -268,10 +278,10 @@ works with both the old and new structure first, then change the database.
 
 ## Troubleshooting
 
-### Game counts don't match, or Step 2.5 reports mismatches
+### Game counts or opponents don't match (Step 2)
 
 -   Check the regular season is actually complete.
--   Step 2.5's output names the specific teams and opponents that are off - much
+-   The opponent check's output names the specific teams and opponents that are off - much
     faster than reading raw counts.
 -   Some end-of-season games may not have odds on OddsPortal.
 
@@ -291,7 +301,7 @@ works with both the old and new structure first, then change the database.
 -   Review the games mentioned; you may need to check them on OddsPortal.
 -   Rows that needed the detail-page fallback have their HTML saved in
     `data/.oddsportal_cache/<season>/debug/` (deleted with the cache).
--   Scraped data only lives in memory during a run: decline at Step 3, fix the
+-   Scraped data only lives in memory during a run: decline at Step 4, fix the
     scraper, and re-run rather than patching data mid-run.
 
 ### Migration fails

@@ -24,9 +24,6 @@ data/.oddsportal_cache/
 *.twbr
 .~*.tw*
 
-# Sample SQL queries for database inspection
-app/queries/sampleQueries.sql
-
 INTERVIEW_STORIES.md
 
 # Environment files hold secrets; only the example template is committed

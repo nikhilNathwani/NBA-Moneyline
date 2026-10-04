@@ -60,13 +60,15 @@ public/
     view/                     # Result rendering
 
 data/
-  main.py                     # End-to-end scrape, validate, and migrate flow
-  scrape/                     # Step 1: OddsPortal scraping
-  validate/                   # Steps 2-2.5: check the scraped data
-  publish/                    # Steps 3-5: migrate to production, update frontend
+  main.py                     # The whole pipeline, steps 1-6 in order
+  scrape/                     # Step 1: OddsPortal (odds) + basketball-reference (schedule)
+  validate/                   # Step 2: check the scraped data
+  standardize/                # Step 3: one dated record per game
+  publish/                    # Steps 4-6: migrate to production, update frontend
   util/                       # Shared data model, constants, and output formatting
-  tests/                      # pytest suite (parsing, validation, migration)
-  README.md                   # Setup, the yearly run, troubleshooting
+  tests/                      # pytest suite, mirroring the folders above
+  sample_queries.sql          # SQL for inspecting the database by hand
+  README.md                   # Setup, the yearly run, the database, troubleshooting
 
 tableau/
   NBA Moneyline.twbx          # Published Tableau Public workbook
@@ -120,15 +122,17 @@ npm run sync-env
 
 The `data/` directory contains the yearly ingestion flow:
 
-1. Scrape one season from OddsPortal
-2. Verify game counts against that season's expected pattern, and every team's
-   opponents against basketball-reference's schedule, then match every game to its
-   real date and home team there
-3. Migrate into PostgreSQL (`teams`, one row per game in `games`, and a
+1. **Scrape** one season: odds and results from OddsPortal, and the official
+   schedule (dates, home/away) from basketball-reference
+2. **Validate**: game counts against that season's expected pattern, and every
+   team's opponents against the official schedule
+3. **Standardize**: match every game to the official schedule, turning two
+   scraped rows per game into one record with its real date and home team
+4. **Migrate** into PostgreSQL (`teams`, one row per game in `games`, and a
    `team_games` view the app reads) in one all-or-nothing transaction, only with
    all checks passing or an explicit override; the tables' constraints reject bad
    rows too
-4. Update frontend season options
+5. Update frontend season options
 
 See [`data/README.md`](data/README.md) for setup, the yearly run, and troubleshooting.
 
