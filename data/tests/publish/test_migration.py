@@ -26,7 +26,7 @@ import pytest
 
 import publish.migrate_to_production as migration
 from util.paths import PROJECT_ROOT
-from validate.matching import GameRecord
+from standardize.matching import GameRecord
 
 POSTGRES_APP_BIN = "/Applications/Postgres.app/Contents/Versions/latest/bin"
 

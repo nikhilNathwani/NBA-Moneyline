@@ -3,13 +3,15 @@
 NBA Moneyline Data Pipeline - Main Script
 
 This script orchestrates the complete workflow:
-1. Scrape NBA moneyline data from OddsPortal for the specified season
-2. Check the scraped game counts per team
-2.5 Check every team's opponents against basketball-reference's schedule,
-    and match every game to its real date there
-3. Confirm, then migrate to the Vercel Postgres database
-4. Update frontend seasons list and push to git
-5. Verify migration was successful
+1. Scrape the season: odds and results from OddsPortal, and the official
+   schedule (dates, home/away) from basketball-reference       - scrape/
+2. Validate: game counts per team, and every team's opponents
+   against the official schedule                                - validate/
+3. Standardize: turn the scraper's two rows per game into one
+   record per real game, dated from the official schedule       - standardize/
+4. Confirm, then migrate to the Vercel Postgres database       - publish/
+5. Update frontend seasons list and push to git                - publish/
+6. Verify migration was successful                             - publish/
 
 One season per run, by design - catching up multiple seasons after a gap
 just means running this multiple times. OddsPortal is already slow and
@@ -47,12 +49,9 @@ def check_requirements():
 check_requirements()
 
 from scrape.odds.scraper import OddsPortalScraper
-from validate.verification import (
-    verify_scraped_data,
-    load_true_schedules,
-    validate_scraped_data_against_schedule
-)
-from validate.matching import match_to_schedule, MatchError
+from scrape.schedules.fetcher import load_true_schedules
+from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
+from standardize.matching import match_to_schedule, MatchError
 from publish.migrate_to_production import (
     verify_postgres_migration,
     migrate_season_to_postgres
@@ -106,19 +105,33 @@ def main():
     season_migrated = False
     season_games = None
 
-    # Step 1: Scrape data
-    print_section_header(f"STEP 1: SCRAPING {season}-{(season+1)%100:02d} SEASON")
+    season_str = f"{season}-{(season+1)%100:02d}"
+    schedules = None
+    schedules_error = None
 
+    # Step 1: Scrape both sources - OddsPortal (odds and results) and
+    # basketball-reference (the official schedule: dates and home/away)
+    print_section_header(f"STEP 1: SCRAPING {season_str} SEASON")
+
+    print("📥 OddsPortal (odds and results)\n")
     scraper = OddsPortalScraper(headless=args.headless)
     try:
         season_games = scraper.scrapeSeasonSchedule(season, cache_dir=odds_cache_dir)
     except RuntimeError as e:
-        print(f"\n❌ Scraping {season}-{(season+1)%100:02d} aborted: {e}")
+        print(f"\n❌ Scraping {season_str} aborted: {e}")
         print(f"⏭️  Pages that rendered successfully before the abort are cached for the next run.")
 
     if season_games is not None:
-        # Step 2: Verify scraped data
-        print_section_header("STEP 2: VERIFYING SCRAPED DATA")
+        print("📥 basketball-reference (official schedule)")
+        try:
+            schedules = load_true_schedules(season, cache_dir=bbref_cache_dir)
+            print(f"✅ Downloaded all {len(schedules)} teams' schedules")
+        except Exception as e:
+            schedules_error = f"{e.__class__.__name__}: {e}"
+            print(f"❌ Couldn't download basketball-reference's schedule ({schedules_error})")
+
+        # Step 2: Validate the scraped data
+        print_section_header("STEP 2: VALIDATING SCRAPED DATA")
 
         verification_results = verify_scraped_data(season_games, season)
         print_verification_results(season, verification_results)
@@ -129,27 +142,24 @@ def main():
         if verification_results['distribution_ok'] is False or verification_results['total_games_ok'] is False:
             failed_checks.append("game counts don't match the expected distribution (Step 2)")
         # Set if migrating is impossible, not just unadvised: the games
-        # table needs each game's date, which only Step 2.5 provides
+        # table needs each game's date, which only Step 3 provides
         cannot_migrate = None
         records = None
 
-        # Step 2.5: Check opponents against the authoritative schedule, and
-        # date every game from it
-        print_section_header("STEP 2.5: CHECKING AGAINST BASKETBALL-REFERENCE'S SCHEDULE")
-
-        try:
-            schedules = load_true_schedules(season, cache_dir=bbref_cache_dir)
-        except Exception as e:
-            print(f"\n❌ Couldn't download basketball-reference's schedule ({e.__class__.__name__}: {e}).")
-            cannot_migrate = (f"basketball-reference's schedule couldn't be downloaded "
-                              f"({e.__class__.__name__}), and it's needed to date each game")
+        if schedules is None:
+            cannot_migrate = (f"basketball-reference's schedule couldn't be downloaded in Step 1 "
+                              f"({schedules_error}), and it's needed to date each game")
         else:
             schedule_comparisons = validate_scraped_data_against_schedule(season_games, schedules)
             print_schedule_validation_results(season, schedule_comparisons)
             mismatched = [c for c in schedule_comparisons if not c.ok]
             if mismatched:
                 failed_checks.append(f"{len(mismatched)} teams' opponents don't match "
-                                     f"basketball-reference (Step 2.5)")
+                                     f"basketball-reference (Step 2)")
+
+            # Step 3: Standardize - turn the scraper's two rows per game into
+            # one record per real game, dated from basketball-reference
+            print_section_header("STEP 3: STANDARDIZING: ONE DATED RECORD PER GAME")
             try:
                 match = match_to_schedule(season_games, schedules)
                 records = match.records
@@ -160,11 +170,10 @@ def main():
                 print(f"\n❌ Couldn't match every game to basketball-reference's schedule: {e}")
                 cannot_migrate = f"not every game could be matched to its date ({e})"
 
-        # Step 3: Prompt for migration - a plain Y/Enter only when every check
+        # Step 4: Prompt for migration - a plain Y/Enter only when every check
         # passed; otherwise migrating takes typing an explicit override.
-        print_section_header("STEP 3: MIGRATION TO VERCEL POSTGRES")
+        print_section_header("STEP 4: MIGRATION TO VERCEL POSTGRES")
 
-        season_str = f"{season}-{(season+1)%100:02d}"
         if cannot_migrate:
             print(f"❌ Can't migrate {season_str}: {cannot_migrate}.")
             if failed_checks:
@@ -202,12 +211,11 @@ def main():
         else:
             print(f"\n⏭️  Skipping migration for {season}-{(season+1)%100:02d}")
 
-    # Step 4: Update frontend with the new season
+    # Step 5: Update frontend with the new season
     if season_migrated:
-        print_section_header("STEP 4: UPDATING FRONTEND SEASONS LIST")
+        print_section_header("STEP 5: UPDATING FRONTEND SEASONS LIST")
 
         if update_seasons_list(season):
-            season_str = f"{season}-{(season+1)%100:02d}"
             print(f"📝 Added {season_str} to frontend seasons list")
 
             if commit_and_push_changes(season):
@@ -217,8 +225,8 @@ def main():
         else:
             print(f"ℹ️  Season already exists in frontend, no update needed")
 
-    # Step 5: Final verification
-    print_section_header("STEP 5: FINAL DATABASE VERIFICATION")
+    # Step 6: Final verification
+    print_section_header("STEP 6: FINAL DATABASE VERIFICATION")
 
     postgres_results = verify_postgres_migration()
     print_postgres_verification(postgres_results)

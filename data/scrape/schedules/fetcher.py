@@ -1,5 +1,9 @@
 """
-Fetches raw season-schedule HTML from basketball-reference.com.
+Fetches season-schedule pages from basketball-reference.com - the pipeline's
+second data source, alongside OddsPortal. Its official schedule is what
+validate/ checks opponents against and what standardize/ dates every game
+from. load_true_schedules is the entry point: fetch every team's page, then
+parse it (parser.py).
 
 Kept separate from parser.py so the parsing logic can be unit
 tested against saved HTML fixtures with no network access, and so this
@@ -12,7 +16,10 @@ import time
 import urllib.error
 import urllib.request
 
-from validate.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
+from typing import Dict, List, Optional
+
+from scrape.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
+from scrape.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
 REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits
@@ -80,3 +87,18 @@ def fetchAllTeamSchedules(seasonStartYear: int, cache_dir: str = None) -> dict:
         if not was_cached:
             time.sleep(REQUEST_DELAY_SECONDS)
     return html_by_team
+
+
+def load_true_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
+    """
+    Every team's true regular-season games from basketball-reference (IST
+    knockout and play-in games excluded), as {team_full_name: games in order}.
+
+    Args:
+        season: seasonStartYear (e.g. 2025 for the 2025-26 season)
+        cache_dir: optional directory to cache fetched schedule HTML in,
+                   so a re-run doesn't re-fetch from basketball-reference
+    """
+    html_by_team = fetchAllTeamSchedules(season, cache_dir=cache_dir)
+    return {team: getTrueRegularSeasonGames(parseScheduleTable(html))
+            for team, html in html_by_team.items()}

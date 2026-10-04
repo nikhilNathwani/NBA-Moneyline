@@ -10,7 +10,7 @@ to migrate to production, two ways:
   is order-agnostic (multiset of opponents, not sequence): OddsPortal's
   listing order doesn't always match the real date order (in 2025-26 it
   listed five games a few places late), so this checks only *which*
-  opponents (and how many times each) a team played. validate/matching.py
+  opponents (and how many times each) a team played. standardize/matching.py
   then places every game on its real date.
 
 Both work directly on the scraper's in-memory output - there's no
@@ -19,10 +19,9 @@ intermediate storage to verify against.
 
 from collections import Counter
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List
 
-from validate.schedules.fetcher import fetchAllTeamSchedules
-from validate.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
+from scrape.schedules.parser import ScheduleGame
 from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 
@@ -110,27 +109,11 @@ def compare_opponent_multisets(true_opponents: List[str], scraped_opponents: Lis
     }
 
 
-def load_true_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
-    """
-    Every team's true regular-season games from basketball-reference (IST
-    knockout and play-in games excluded), as {team_full_name: games in order}.
-    The only network access in validate/; everything else here is pure.
-
-    Args:
-        season: seasonStartYear (e.g. 2025 for the 2025-26 season)
-        cache_dir: optional directory to cache fetched schedule HTML in,
-                   so a re-run doesn't re-fetch from basketball-reference
-    """
-    html_by_team = fetchAllTeamSchedules(season, cache_dir=cache_dir)
-    return {team: getTrueRegularSeasonGames(parseScheduleTable(html))
-            for team, html in html_by_team.items()}
-
-
 def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]],
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (from load_true_schedules).
+    authoritative schedule (from scrape.schedules.fetcher.load_true_schedules).
     """
     results = []
     for team_full_name, true_games in schedules.items():

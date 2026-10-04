@@ -14,7 +14,7 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from typing import Dict, List
 
-from validate.matching import GameRecord
+from standardize.matching import GameRecord
 from util.paths import PROJECT_ROOT
 
 
@@ -83,7 +83,7 @@ def _check_season(cursor, season: int):
 
 def migrate_season_to_postgres(records: List[GameRecord], season: int) -> int:
     """
-    Migrate a season's games (from validate.matching) to Postgres.
+    Migrate a season's games (from standardize.matching) to Postgres.
 
     Args:
         records: one GameRecord per real game
