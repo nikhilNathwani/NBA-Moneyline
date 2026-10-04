@@ -7,7 +7,7 @@ migration (data/main.py) so the dashboard picks up the new season.
 
 Then open tableau/NBA Moneyline.twbx (the live connection reads the new file),
 add the season to the Season parameter's list, and re-publish to Tableau Public.
-See YEARLY_WORKFLOW.md.
+See data/README.md.
 """
 
 import csv

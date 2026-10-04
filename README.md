@@ -61,12 +61,13 @@ public/
 
 data/
   main.py                     # End-to-end scrape, validate, and migrate flow
-  scrape/                     # OddsPortal scraping + pre-migration checks
-  publish/                    # Migrate verified games to production, update frontend
+  scrape/                     # Step 1: OddsPortal scraping
+  validate/                   # Steps 2-2.5: check the scraped data
+  publish/                    # Steps 3-5: migrate to production, update frontend
   util/                       # Shared data model, constants, and output formatting
-  test/                       # pytest suite (parsing, validation, migration)
+  tests/                      # pytest suite (parsing, validation, migration)
   schema.sql                  # The production games table and its constraints
-  YEARLY_WORKFLOW.md          # Operational yearly procedure
+  README.md                   # Setup, the yearly run, troubleshooting
 
 tableau/
   NBA Moneyline.twbx          # Published Tableau Public workbook
@@ -128,7 +129,7 @@ The `data/` directory contains the yearly ingestion flow:
    reject bad rows too
 4. Update frontend season options
 
-See `data/README.md` and `data/YEARLY_WORKFLOW.md` for full operational details.
+See [`data/README.md`](data/README.md) for setup, the yearly run, and troubleshooting.
 
 ## Tableau dashboard
 
@@ -142,7 +143,7 @@ a data-analyst-portfolio rebuild of the same simulator.
 
 To edit: open the `.twbx` from this folder (not Tableau's default Workbooks folder) so the repo stays the source of truth, and re-publish to Tableau Public from here (same workbook name → replaces the existing viz, URL preserved). Custom team-logo shapes live in `~/Documents/My Tableau Repository/Shapes/NBA/` (Tableau requires shape sources there); the published `.twbx` bundles them.
 
-Annual data refresh: `python3 data/publish/export_tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/YEARLY_WORKFLOW.md`](data/YEARLY_WORKFLOW.md#refresh-the-tableau-dashboard).
+Annual data refresh: `python3 data/publish/export_tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
 
 ## Testing and Validation
 
