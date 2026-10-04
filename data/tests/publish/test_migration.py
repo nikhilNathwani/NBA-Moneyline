@@ -25,6 +25,7 @@ import pytest
 
 import publish.migrate_to_production as migration
 from util.game import Game
+from util.paths import PROJECT_ROOT
 
 POSTGRES_APP_BIN = "/Applications/Postgres.app/Contents/Versions/latest/bin"
 
@@ -36,10 +37,15 @@ _connect_to_production = migration.get_postgres_connection
 @pytest.fixture(scope="module")
 def games_table_ddl():
     """CREATE TABLE for `games`, rebuilt from production's catalog (read-only)."""
+    env_path = os.path.join(PROJECT_ROOT, ".env.development.local")
+    if not os.path.exists(env_path) and not os.getenv("POSTGRES_URL"):
+        pytest.skip("no database credentials - run `npm run sync-env` from the project root "
+                    "to pull .env.development.local from Vercel")
     try:
         conn = _connect_to_production()
     except Exception as e:
-        pytest.skip(f"can't read the games table definition from production ({e.__class__.__name__})")
+        pytest.skip(f"can't reach production to read the games table definition "
+                    f"({e.__class__.__name__}) - check your network connection and POSTGRES_URL")
     try:
         conn.set_session(readonly=True)
         cursor = conn.cursor()
