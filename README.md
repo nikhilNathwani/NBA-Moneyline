@@ -122,10 +122,12 @@ The `data/` directory contains the yearly ingestion flow:
 
 1. Scrape one season from OddsPortal
 2. Verify game counts against that season's expected pattern, and every team's
-   opponents against basketball-reference's schedule
-3. Migrate into PostgreSQL in one all-or-nothing transaction (only with all checks
-   passing, or an explicit override); the table's own constraints
-   reject bad rows too
+   opponents against basketball-reference's schedule, then match every game to its
+   real date and home team there
+3. Migrate into PostgreSQL (`teams`, one row per game in `games`, and a
+   `team_games` view the app reads) in one all-or-nothing transaction, only with
+   all checks passing or an explicit override; the tables' constraints reject bad
+   rows too
 4. Update frontend season options
 
 See [`data/README.md`](data/README.md) for setup, the yearly run, and troubleshooting.

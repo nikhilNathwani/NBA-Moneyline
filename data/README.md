@@ -14,7 +14,8 @@ data/
                    the pure HTML parsing)
   validate/        Steps 2-2.5: check the scraped data before it's trusted
                    (verification.py), against basketball-reference's schedule
-                   (schedules/)
+                   (schedules/), and match every game to its real date there
+                   (matching.py)
   publish/         Steps 3-5: migrate to Postgres, update the web app's season
                    list, export the CSV that Tableau reads
   util/            Shared pieces: the Game record, expected game counts per
@@ -92,7 +93,7 @@ Compares each team's game count with that season's expected pattern
 ✅ Per-team distribution matches expectations: 22 teams @ 82, 4 teams @ 81, 4 teams @ 80
 ```
 
--   Every game is stored twice, once per team, so 2,448 rows = 1,224 games.
+-   The scraper produces two rows per game, one per team, so 2,448 rows = 1,224 games.
 -   Since 2023-24, 8 teams finish below 82: in-season tournament (NBA Cup) knockout
     games are excluded, so the 4 semifinalists land on 80 and the 4 quarterfinal
     losers on 81. Which teams is detected each season, not hardcoded.
@@ -109,9 +110,24 @@ schedule (play-in and tournament knockout games excluded):
 ✅ All 30 teams' scraped opponents match the authoritative schedule
 ```
 
-A mismatch lists the exact missing/extra opponents for that team. The comparison
-ignores game order, so a postponed game doesn't cause a false alarm.
-`--skip-schedule-validation` skips this step (e.g. no network access).
+A mismatch lists the exact missing/extra opponents for that team. This
+comparison ignores order; the matching step below handles order.
+
+Then every game is matched to its entry on basketball-reference's schedule, which
+gives it its real date and home team (`validate/matching.py`):
+
+```
+📅 Matched all 1224 games to their dates on basketball-reference
+```
+
+The match needs both teams' rows to agree: right opponents, right winner, mirrored
+odds, and close to the right place in each team's schedule. Games OddsPortal lists
+out of date order (it did for 2025-26) still match, and their game numbers come
+from the real dates. If any game can't be matched to exactly one pair of rows, it
+says which, and the season can't be migrated - nothing is guessed.
+
+This step needs network access to basketball-reference.com: the database needs
+each game's date, and this is where dates come from.
 
 ### Step 3: Confirm and migrate
 
@@ -121,9 +137,8 @@ If every check passed:
 All checks passed. Ready to migrate 2025-26 data to Vercel Postgres? (Y/n):
 ```
 
-If any check failed - including Step 2.5 crashing, or skipping Step 2.5 for a season
-with no fixed count pattern, so that nothing was checked - it lists what failed and
-migrating takes typing `migrate anyway`; Enter (or anything else) cancels:
+If a check failed, it lists what failed and migrating takes typing
+`migrate anyway`; Enter (or anything else) cancels:
 
 ```
 ❌ Not all checks passed for 2025-26:
@@ -133,15 +148,16 @@ Type 'migrate anyway' to migrate 2025-26 regardless, or press Enter to cancel:
 ```
 
 Override only when you've confirmed the data is right and the expectation is
-what's wrong (e.g. the league changed its format).
+what's wrong (e.g. the league changed its format). If basketball-reference couldn't
+be downloaded or a game couldn't be matched to its date, there's no override: the
+season can't be migrated without dates.
 
-The migration deletes the season's existing rows, inserts the new ones (odds as
-plain integers like `150` / `-200`; the web app adds the `+` for display), then
-checks the whole season: 30 teams, wins = losses, each team's game numbers 1..N with
-no gaps. It's all one transaction, so any failure leaves production exactly as it
-was, and the table's own constraints (see [The `games` table](#the-games-table))
-reject bad rows the same way.
-Re-running a season is safe.
+The migration deletes the season's existing games, inserts the new ones (one row
+per game; odds as plain integers like `150` / `-200`, and the web app adds the `+`
+for display), then checks the whole season: all 30 teams play, and no team plays
+twice on one date. It's all one transaction, so any failure leaves production
+exactly as it was, and the tables' own constraints (see [The database](#the-database))
+reject bad rows the same way. Re-running a season is safe.
 
 ### Step 4: Update the web app
 
@@ -152,12 +168,12 @@ Vercel.
 ### Step 5: Final database check
 
 ```
-📊 Team-Game Rows Per Season in Database (2 per game):
-  2016-17:......................................... 2460 rows
+📊 Games Per Season in Database:
+  2016-17:......................................... 1230 games
   ...
-  2025-26:......................................... 2448 rows
+  2025-26:......................................... 1224 games
   ─────────────────────────────────────────────────────────
-  TOTAL:........................................... 23922 rows
+  TOTAL:........................................... 11961 games
 ```
 
 ### Afterwards: refresh the Tableau dashboard
@@ -192,44 +208,63 @@ cd data && source .venv/bin/activate && pytest
 
 Runs the parsing and checking logic against saved pages (no network access) -
 worth running after any scraper change. The migration tests start a throwaway
-local Postgres and copy the `games` table's current definition from production
-into it (production is only read, never written), so they always test against
-the real columns and constraints. They're skipped if Postgres isn't installed
+local Postgres and copy the current definitions of the `teams` and `games` tables
+and the `team_games` view from production into it (production is only read, never
+written), so they always test against the real columns and constraints. They're skipped if Postgres isn't installed
 locally or production can't be reached.
 
-## The `games` table
+## The database
 
 *As of 2026-10-04. The database itself is the source of truth (the migration tests
-read its definition live); update this section when you change the table.*
+read its definitions live); update this section when you change it.*
 
-The one production table: written by the pipeline, read by the web app
-(`app/queries/`) and the Tableau export. One row per team per game, so every game
-appears twice, once from each team's side.
+Written by the pipeline, read by the web app (`app/queries/`) and the Tableau export.
+(The same Postgres database also holds Titan Tracker's three `titan*` tables.)
+
+**`teams`**: one row per franchise.
 
 | Column | Type | Meaning |
 |---|---|---|
-| `team` | varchar(255) | the team this row is about |
+| `team_id` | smallint | primary key |
+| `name` | varchar(255) | e.g. "Boston Celtics" (unique) |
+
+**`games`**: one row per real game.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `game_id` | integer | primary key (generated) |
 | `seasonstartyear` | integer | year the season started (2025 = 2025-26) |
-| `gamenumber` | integer | the team's Nth game of the season, in date order |
-| `outcome` | boolean | true if `team` won |
-| `winodds` | integer | American moneyline odds on `team` winning (e.g. 150, -200) |
-| `loseodds` | integer | odds on `team` losing (= the opponent's `winodds`) |
+| `game_date` | date | when it was played (from basketball-reference) |
+| `home_team_id`, `away_team_id` | smallint | references `teams` |
+| `neutral_site` | boolean | played at a neutral venue (e.g. abroad); home/away is then alphabetical, for structure only |
+| `home_won` | boolean | true if the home team won |
+| `home_odds`, `away_odds` | integer | American moneyline odds on each team winning (e.g. 150, -200) |
 
-All columns are NOT NULL. Constraints:
+All columns are NOT NULL. Constraints: home and away teams must exist in `teams` and
+differ; a team can't be home twice (or away twice) on one date; the date must fall
+within the season; odds must be valid American odds (-100 or below, or 100 or above).
 
--   `games_pkey`: primary key on (`team`, `seasonstartyear`, `gamenumber`)
--   `games_gamenumber_range`: `gamenumber` between 1 and 82
--   `games_winodds_american`, `games_loseodds_american`: odds are -100 or below, or
-    100 or above (valid American odds)
+**`team_games`** (a view): each game from both teams' sides - two rows per game,
+the shape the web app and Tableau use. Columns: `team`, `seasonstartyear`,
+`gamenumber` (the team's Nth game, numbered by date), `outcome` (true if `team`
+won), `winodds`, `loseodds` (= the opponent's `winodds`), `opponent`, `game_date`,
+`is_home` (null for neutral sites), `game_id`. A view stores nothing itself; it's a
+saved query over `games` and `teams`, so it can't drift from them.
 
-Whole-season rules (30 teams, wins = losses, game numbers 1..N with no gaps) span
-many rows, so they're checked by the migration instead
-(`publish/migrate_to_production.py`).
+Whole-season rules (all 30 teams play, no team plays twice on one date) span many
+rows, so the migration checks them (`publish/migrate_to_production.py`).
 
-History: on 2026-10-04 the odds columns changed from text (`"+150"`) to integer and
-the constraints were added; before that the table had none. The web app still
-reads this table live, so for any structural change, deploy app code that works
-with both the old and new structure first, then change the table.
+History (2026-10-04):
+-   The odds columns changed from text (`"+150"`) to integer, and the table got its
+    first constraints.
+-   The single `games` table (two rows per game, no dates or opponents) was
+    replaced by `teams` + one-row-per-game `games` + the `team_games` view. Every
+    old row was matched to its real game on basketball-reference, confirmed by
+    mirrored odds and winners, without re-scraping OddsPortal. The values were
+    unchanged except 26 game numbers in 2025-26 (see Notes).
+
+The web app reads these live, so for any structural change, deploy app code that
+works with both the old and new structure first, then change the database.
 
 ## Troubleshooting
 
@@ -262,8 +297,9 @@ with both the old and new structure first, then change the table.
 ### Migration fails
 
 -   Check `POSTGRES_URL` in `.env.development.local` and your network connection.
--   A constraint name in the error (e.g. `games_pkey`, `games_winodds_american`) or
-    "season checks failed" means the data itself was rejected. Nothing was written,
+-   A constraint name in the error (e.g. `games_home_team_once_per_day`,
+    `games_home_odds_american`), "teams not in the teams table" or "season checks
+    failed" means the data itself was rejected. Nothing was written,
     so fix the cause and re-run.
 
 ### Browser problems
@@ -280,14 +316,10 @@ with both the old and new structure first, then change the table.
     Postgres is the only source of truth. The page caches (`data/.oddsportal_cache/`,
     `data/.bbref_cache/`) exist only so a failed run can resume cheaply - nothing
     reads data from them - and are deleted after a successful migration.
--   **Game order (open question, worth investigating some time)**: Step 2.5 ignores
-    game order on purpose (decided 2026-07-16, commit `68dab74`) so postponed games
-    don't cause false alarms. The side effect is that a team's game numbers can
-    differ slightly from basketball-reference's order. A 2026-10-04 check of every
-    season in production found game counts and wins matching for all 30 teams in
-    all 10 seasons, and the game-by-game win/loss order matching in every season
-    except 2025-26: there, 7 teams (ATL, BOS, DEN, HOU, IND, PHI, UTA) each have one
-    pair of games in a different order. Season totals are unaffected; only those
-    games' "Game #" labels (and the running-total line between them) differ. The
-    cause isn't confirmed: postponements are the likely explanation, but checking
-    needs a re-scrape of OddsPortal.
+-   **OddsPortal's listing order isn't always date order**: for 2025-26, five
+    games (BOS-MIN Nov 29, ATL-PHI Dec 14, POR-UTA Jan 5, ATL-IND Jan 26, DEN-HOU
+    Mar 11) were listed 1-3 places later than when they were played, so the old
+    table had 26 rows' game numbers off. Game numbers now come from real dates, which
+    fixed them. 2025-26 was the only season scraped from OddsPortal's generic
+    "current results" page (the others came from archived season pages), the likely
+    cause; not confirmed.
