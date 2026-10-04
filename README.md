@@ -61,9 +61,11 @@ public/
 
 data/
   main.py                     # End-to-end scrape, validate, and migrate flow
-  scrape/                     # OddsPortal moneyline scraping, save + verify locally
+  scrape/                     # OddsPortal scraping + pre-migration checks
   publish/                    # Migrate verified games to production, update frontend
   util/                       # Shared data model, constants, and output formatting
+  test/                       # pytest suite (parsing, validation, migration)
+  schema.sql                  # The production games table and its constraints
   YEARLY_WORKFLOW.md          # Operational yearly procedure
 
 tableau/
@@ -118,9 +120,12 @@ npm run sync-env
 
 The `data/` directory contains the yearly ingestion flow:
 
-1. Scrape seasons from OddsPortal
-2. Verify expected game counts
-3. Migrate records into PostgreSQL
+1. Scrape one season from OddsPortal
+2. Verify game counts against that season's expected pattern, and every team's
+   opponents against basketball-reference's schedule
+3. Migrate into PostgreSQL in one all-or-nothing transaction (only with all checks
+   passing, or an explicit override); the table's constraints (`data/schema.sql`)
+   reject bad rows too
 4. Update frontend season options
 
 See `data/README.md` and `data/YEARLY_WORKFLOW.md` for full operational details.

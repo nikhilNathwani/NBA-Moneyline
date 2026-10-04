@@ -3,8 +3,8 @@ Verifies the quality of scraped moneyline data before it's trusted enough
 to migrate to production, two ways:
 
 - verify_scraped_data: total and per-team game counts against a hardcoded,
-  independently-derived expectation (see util/constants.py) - fast, no
-  network access.
+  independently-derived expectation for that season (see util/constants.py)
+  - fast, no network access.
 - validate_scraped_data_against_schedule: per-team, per-opponent game
   counts against basketball-reference's authoritative schedule. Comparison
   is order-agnostic (multiset of opponents, not sequence): OddsPortal and
@@ -23,48 +23,68 @@ from typing import Dict, List, Optional
 
 from scrape.schedules.fetcher import fetchAllTeamSchedules
 from scrape.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
-from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
+from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 
 
-def verify_scraped_data(team_games: Dict[str, List[Game]]) -> Dict:
+def verify_scraped_data(team_games: Dict[str, List[Game]], season: int) -> Dict:
     """
-    Verify scraped data straight from the scraper's output.
+    Verify scraped data straight from the scraper's output against the
+    season's expected per-team game counts (see util/constants.py).
 
     Returns dict with:
-        - total_games: int
+        - total_games: int (team-game rows, 2 per game)
         - team_counts: list of (team, count) tuples
-        - total_games_ok: bool (matches TOTAL_EXPECTED_GAMES)
-        - distribution_ok: bool (per-team counts match the expected
-          82/81/80 distribution accounting for the in-season tournament,
-          see util/constants.py)
+        - expected_distribution: {games: teams} for this season, or None if
+          the season has no fixed pattern (2019-20) - then the three results
+          below are None too, meaning "not applicable", not "passed"
+        - expected_total: int or None
+        - total_games_ok: bool or None (matches expected_total)
+        - distribution_ok: bool or None (per-team counts match
+          expected_distribution)
         - unexpected_teams: list of (team, count) tuples whose count isn't
-          82, 81, or 80 at all
+          in expected_distribution at all
         - distribution_mismatch: dict of {expected_count: (expected_teams, actual_teams)}
           for counts that exist in the distribution but with the wrong number of teams
     """
     team_counts = sorted((team, len(games)) for team, games in team_games.items())
     total_games = sum(count for _, count in team_counts)
+    results = {
+        'total_games': total_games,
+        'team_counts': team_counts,
+        'expected_distribution': None,
+        'expected_total': None,
+        'total_games_ok': None,
+        'distribution_ok': None,
+        'unexpected_teams': [],
+        'distribution_mismatch': {},
+    }
+
+    distribution = expected_game_count_distribution(season)
+    if distribution is None:
+        return results
 
     count_tally = Counter(count for _, count in team_counts)
 
     unexpected_teams = [(team, count) for team, count in team_counts
-                        if count not in EXPECTED_GAME_COUNT_DISTRIBUTION]
+                        if count not in distribution]
 
     distribution_mismatch = {}
-    for expected_count, expected_teams in EXPECTED_GAME_COUNT_DISTRIBUTION.items():
+    for expected_count, expected_teams in distribution.items():
         actual_teams = count_tally.get(expected_count, 0)
         if actual_teams != expected_teams:
             distribution_mismatch[expected_count] = (expected_teams, actual_teams)
 
-    return {
-        'total_games': total_games,
-        'team_counts': team_counts,
-        'total_games_ok': total_games == TOTAL_EXPECTED_GAMES,
+    expected_total = expected_total_rows(distribution)
+    results.update({
+        'expected_distribution': distribution,
+        'expected_total': expected_total,
+        'total_games_ok': total_games == expected_total,
         'distribution_ok': not unexpected_teams and not distribution_mismatch,
         'unexpected_teams': unexpected_teams,
         'distribution_mismatch': distribution_mismatch,
-    }
+    })
+    return results
 
 
 @dataclass

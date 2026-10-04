@@ -4,7 +4,6 @@ Console output formatting utilities for the NBA Moneyline data pipeline.
 
 from typing import Dict, List
 
-from util.constants import TOTAL_EXPECTED_GAMES, EXPECTED_GAME_COUNT_DISTRIBUTION
 from scrape.verification import TeamScheduleComparison
 
 
@@ -19,26 +18,35 @@ def print_verification_results(season: int, results: Dict):
     """Print scraped data verification results."""
     print_section_header(f"VERIFICATION RESULTS - {season}-{(season+1)%100:02d} Season")
 
-    total_ok = results.get('total_games_ok')
-    status = "✅" if total_ok else "❌"
-    print(f"{status} Total Games Scraped: {results['total_games']} (expected {TOTAL_EXPECTED_GAMES})\n")
+    distribution = results['expected_distribution']
+    if distribution is None:
+        print(f"ℹ️  Total team-game rows scraped: {results['total_games']} (2 per game)")
+        print(f"ℹ️  No fixed game-count expectation for this season (see util/constants.py) - "
+              f"the schedule validation in Step 2.5 is the check.\n")
+    else:
+        status = "✅" if results['total_games_ok'] else "❌"
+        print(f"{status} Total team-game rows scraped: {results['total_games']} "
+              f"(expected {results['expected_total']}; 2 per game)\n")
 
     print(f"📋 Games Per Team:")
     print(f"{'─'*70}")
     for team, count in results['team_counts']:
-        flag = "" if count in EXPECTED_GAME_COUNT_DISTRIBUTION else "  ⚠️  unexpected count"
+        flag = "" if distribution is None or count in distribution else "  ⚠️  unexpected count"
         print(f"  {team:.<50} {count:>3} games{flag}")
     print(f"{'─'*70}\n")
 
-    if results.get('distribution_ok'):
+    if distribution is None:
+        return
+    if results['distribution_ok']:
         print(f"✅ Per-team distribution matches expectations: "
-              f"{', '.join(f'{n} teams @ {c}' for c, n in sorted(EXPECTED_GAME_COUNT_DISTRIBUTION.items(), reverse=True))}\n")
+              f"{', '.join(f'{n} teams @ {c}' for c, n in sorted(distribution.items(), reverse=True))}\n")
     else:
         print(f"❌ Per-team distribution does NOT match expectations:")
-        for expected_count, (expected_teams, actual_teams) in results.get('distribution_mismatch', {}).items():
+        for expected_count, (expected_teams, actual_teams) in results['distribution_mismatch'].items():
             print(f"    Expected {expected_teams} teams with {expected_count} games, found {actual_teams}")
-        for team, count in results.get('unexpected_teams', []):
-            print(f"    {team}: {count} games (not 82/81/80 at all)")
+        for team, count in results['unexpected_teams']:
+            expected_counts = '/'.join(str(c) for c in sorted(distribution, reverse=True))
+            print(f"    {team}: {count} games (not {expected_counts} at all)")
         print()
 
 
@@ -72,12 +80,12 @@ def print_postgres_verification(results: Dict):
         print(f"❌ Error connecting to database: {results['error']}\n")
         return
     
-    print(f"📊 Games Per Season in Database:")
+    print(f"📊 Team-Game Rows Per Season in Database (2 per game):")
     print(f"{'─'*70}")
     total_games = 0
     for season, count in results['season_counts']:
-        print(f"  {season}-{(season+1)%100:02d}:{'.'*(50-len(f'{season}-{(season+1)%100:02d}:'))} {count:>5} games")
+        print(f"  {season}-{(season+1)%100:02d}:{'.'*(50-len(f'{season}-{(season+1)%100:02d}:'))} {count:>5} rows")
         total_games += count
     print(f"{'─'*70}")
-    print(f"  TOTAL:{'.'*55} {total_games:>5} games")
+    print(f"  TOTAL:{'.'*55} {total_games:>5} rows")
     print(f"{'─'*70}\n")

@@ -25,7 +25,7 @@ Displays comprehensive stats and an explicit pass/fail against the expected
 game-count distribution (see `util/constants.py`):
 
 ```
-✅ Total Games Scraped: 2448 (expected 2448)
+✅ Total team-game rows scraped: 2448 (expected 2448; 2 per game)
 
 📋 Games Per Team:
   Atlanta Hawks................................. 82 games
@@ -37,13 +37,17 @@ game-count distribution (see `util/constants.py`):
 
 **What to check:**
 
--   Total should be 2,448 games (30 teams × 82, minus 12 excluded in-season-tournament
-    knockout games: the 4 IST semifinalists each play 2 knockout games and land on 80,
-    the 4 teams eliminated in the IST quarterfinal each play 1 and land on 81, the
-    remaining 22 teams are unaffected at 82). If a season doesn't have an in-season
-    tournament, expect all 30 teams at 82 (2,460 total) instead.
+-   Total should be 2,448 team-game rows - each game is stored once per team, so 1,224
+    games (30 teams × 82, minus 12 excluded in-season-tournament knockout games: the 4
+    IST semifinalists each play 2 knockout games and land on 80, the 4 teams eliminated
+    in the IST quarterfinal each play 1 and land on 81, the remaining 22 teams are
+    unaffected at 82).
+-   The expectation is looked up by season (`util/constants.py`), so re-running an older
+    season checks it against that season's format: all 30 at 82 before 2023-24, all 30
+    at 72 in 2020-21. 2019-20 (the COVID bubble) has no fixed pattern, so Step 2 just
+    prints the counts and Step 2.5 is the check.
 -   The pass/fail line should say ✅. If it doesn't, the printed mismatches tell you
-    which teams/counts are off - don't proceed to migration until this is resolved.
+    which teams/counts are off, and Step 3 won't migrate without an explicit override.
 
 ### Step 2.5: Schedule Validation
 
@@ -62,24 +66,41 @@ basketball-reference.com or want a faster run.
 
 ### Step 3: Confirmation
 
-You'll be prompted:
+If every check passed, you'll be prompted:
 
 ```
-Ready to migrate 2024-25 data to Vercel Postgres? (Y/n):
+All checks passed. Ready to migrate 2024-25 data to Vercel Postgres? (Y/n):
 ```
 
 -   Review the stats above
--   Type `Y` and press Enter to proceed
+-   Type `Y` (or just press Enter) to proceed
 -   Type `n` to cancel and investigate issues
+
+If any check failed - including Step 2.5 crashing, or skipping Step 2.5 for a season
+with no fixed count expectation, so that nothing was checked - it lists what failed
+instead, and migrating takes typing `migrate anyway`; Enter (or anything else) cancels:
+
+```
+❌ Not all checks passed for 2024-25:
+    - game counts don't match the expected distribution (Step 2)
+
+Type 'migrate anyway' to migrate 2024-25 regardless, or press Enter to cancel:
+```
+
+Override only when you've confirmed the data is right and the expectation is what's
+wrong (e.g. the league changed its format).
 
 ### Step 4: Migration to Database
 
 -   Deletes any existing data for this season in Postgres
--   Converts data types:
-    -   `outcome`: INTEGER (0/1) → BOOLEAN
-    -   `winOdds/loseOdds`: INTEGER → VARCHAR with +/- prefix
--   Inserts all games into production database
--   Shows count of inserted games
+-   Inserts all games into production database (odds as plain integers, e.g. `150` /
+    `-200` - the web app adds the `+` for display)
+-   Checks the whole season: 30 teams, wins = losses, each team's game numbers 1..N
+    with no gaps
+-   Shows count of inserted rows (2 per game)
+-   All-or-nothing: the delete, inserts and season checks run in one transaction, so a
+    failure leaves production exactly as it was. The table's own constraints
+    (`data/schema.sql`) reject bad individual rows the same way
 
 ### Step 5: Update Frontend
 
@@ -92,14 +113,14 @@ Ready to migrate 2024-25 data to Vercel Postgres? (Y/n):
 Displays all seasons in your database:
 
 ```
-📊 Games Per Season in Database:
-  2016-17:......................................... 2460 games
-  2017-18:......................................... 2460 games
+📊 Team-Game Rows Per Season in Database (2 per game):
+  2016-17:......................................... 2460 rows
+  2017-18:......................................... 2460 rows
   ...
-  2024-25:......................................... 2448 games
-  2025-26:......................................... 2448 games ✨ NEW
+  2024-25:......................................... 2448 rows
+  2025-26:......................................... 2448 rows ✨ NEW
   ─────────────────────────────────────────────────────────
-  TOTAL:........................................... 23922 games
+  TOTAL:........................................... 23922 rows
 ```
 
 ## Options
@@ -169,15 +190,20 @@ Then in Tableau:
 
 -   Review the specific games mentioned
 -   May need to manually check those games on OddsPortal
--   Data only exists in memory for the duration of a run - type `n` at the Step 3
-    prompt to decline migration, fix the underlying scraper issue, and re-run
+-   Rows whose odds needed the detail-page fallback have their HTML saved under
+    `data/.oddsportal_cache/<season>/debug/` (deleted with the cache after a
+    successful migration)
+-   Data only exists in memory for the duration of a run - decline at the Step 3
+    prompt, fix the underlying scraper issue, and re-run
     from scratch rather than trying to patch the data mid-run
 
 ### Migration fails
 
 -   Check `.env.development.local` has valid `POSTGRES_URL`
 -   Verify network connection to Vercel
--   Check error message for specific issue
+-   Check error message for specific issue - a constraint name (e.g.
+    `games_pkey`, `games_winodds_american`) or "season checks failed" means the data
+    itself was rejected; nothing was written, so fix the cause and re-run
 
 ### Browser automation issues
 
@@ -239,7 +265,9 @@ POSTGRES_URL=postgres://username:password@host/database
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
 -   **Tests**: `pytest data/test/` runs the parsing/comparison logic against saved
-    fixtures with no network access - worth running after any scraper changes
+    fixtures with no network access - worth running after any scraper changes. The
+    migration tests also start a throwaway local Postgres (never production) from
+    `data/schema.sql`, and are skipped if Postgres isn't installed
 
 ## Need Help?
 

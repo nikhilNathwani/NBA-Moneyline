@@ -24,22 +24,24 @@ Usage:
 import os
 import sys
 import shutil
-import subprocess
 import argparse
 
-# Check and install requirements if needed
+# Fail fast with setup instructions if the venv is missing packages, rather
+# than installing anything as a side effect (see README.md's Setup section)
 def check_requirements():
-    """Check if required packages are installed, install if missing."""
+    """Exit with venv setup instructions if a required package is missing."""
     try:
         import psycopg2
         import selenium
         import bs4
         from dotenv import load_dotenv
-    except ImportError:
-        print("📦 Installing required packages...")
-        requirements_path = os.path.join(os.path.dirname(__file__), 'requirements.txt')
-        subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', requirements_path], check=True)
-        print("✅ Packages installed successfully\n")
+    except ImportError as e:
+        sys.exit(
+            f"❌ Missing package '{e.name}' - is the venv set up and activated? From data/:\n"
+            f"    uv venv --managed-python .venv\n"
+            f"    uv pip install --python .venv/bin/python -r requirements.txt\n"
+            f"    source .venv/bin/activate"
+        )
 
 check_requirements()
 
@@ -118,34 +120,59 @@ def main():
         # Step 2: Verify scraped data
         print_section_header("STEP 2: VERIFYING SCRAPED DATA")
 
-        verification_results = verify_scraped_data(season_games)
+        verification_results = verify_scraped_data(season_games, season)
         print_verification_results(season, verification_results)
 
+        # Every reason this season shouldn't migrate without a deliberate
+        # override. A check that couldn't run counts too - only skipping
+        # schedule validation on purpose (the flag) doesn't.
+        failed_checks = []
+        has_count_expectation = verification_results['distribution_ok'] is not None
+        if has_count_expectation and not (verification_results['total_games_ok']
+                                          and verification_results['distribution_ok']):
+            failed_checks.append("game counts don't match the expected distribution (Step 2)")
+
         # Step 2.5: Validate scraped opponents against the authoritative schedule
-        if not args.skip_schedule_validation:
+        if args.skip_schedule_validation:
+            if not has_count_expectation:
+                failed_checks.append("this season has no fixed game-count expectation and "
+                                     "schedule validation was skipped, so nothing was checked")
+        else:
             print_section_header("STEP 2.5: VALIDATING AGAINST AUTHORITATIVE SCHEDULE")
 
             try:
                 schedule_comparisons = validate_scraped_data_against_schedule(
                     season_games, season, cache_dir=bbref_cache_dir)
                 print_schedule_validation_results(season, schedule_comparisons)
+                mismatched = [c for c in schedule_comparisons if not c.ok]
+                if mismatched:
+                    failed_checks.append(f"{len(mismatched)} teams' opponents don't match "
+                                         f"basketball-reference (Step 2.5)")
             except Exception as e:
-                print(f"\n⚠️  Schedule validation failed ({e.__class__.__name__}: {e}) - "
-                      f"skipping this check rather than losing the completed scrape over it.")
-                print(f"⚠️  Proceeding to migration without schedule validation for "
-                      f"{season}-{(season+1)%100:02d}. Consider re-running Step 2.5 manually later.")
+                print(f"\n⚠️  Schedule validation failed ({e.__class__.__name__}: {e}).")
+                failed_checks.append(f"schedule validation couldn't run ({e.__class__.__name__})")
 
-        # Step 3: Prompt for migration
+        # Step 3: Prompt for migration - a plain Y/Enter only when every check
+        # passed; otherwise migrating takes typing an explicit override.
         print_section_header("STEP 3: MIGRATION TO VERCEL POSTGRES")
 
-        response = input(f"Ready to migrate {season}-{(season+1)%100:02d} data to Vercel Postgres? (Y/n): ").strip().upper()
+        season_str = f"{season}-{(season+1)%100:02d}"
+        if not failed_checks:
+            response = input(f"All checks passed. Ready to migrate {season_str} data to Vercel Postgres? (Y/n): ")
+            proceed = response.strip().upper() in ['Y', 'YES', '']
+        else:
+            print(f"❌ Not all checks passed for {season_str}:")
+            for reason in failed_checks:
+                print(f"    - {reason}")
+            response = input(f"\nType 'migrate anyway' to migrate {season_str} regardless, or press Enter to cancel: ")
+            proceed = response.strip().lower() == 'migrate anyway'
 
-        if response in ['Y', 'YES', '']:
+        if proceed:
             print(f"\n🚀 Starting migration for {season}-{(season+1)%100:02d}...\n")
 
             try:
                 inserted = migrate_season_to_postgres(season_games, season)
-                print(f"\n✅ Migration complete: {inserted} games inserted")
+                print(f"\n✅ Migration complete: {inserted} team-game rows inserted ({inserted // 2} games)")
                 season_migrated = True
 
                 # Data is safely in production now - the local scrape caches
@@ -156,7 +183,7 @@ def main():
                         shutil.rmtree(cache_dir)
                 print(f"🧹 Cleaned up local scrape caches for {season}-{(season+1)%100:02d}")
             except Exception as e:
-                print(f"\n❌ Migration failed: {e}")
+                print(f"\n❌ Migration failed and was rolled back - production data is unchanged: {e}")
         else:
             print(f"\n⏭️  Skipping migration for {season}-{(season+1)%100:02d}")
 

@@ -1,8 +1,13 @@
 """
 Tests for scrape.schedules.parser using saved HTML fixtures
-(no network access) covering the three cases that matter for our IST/play-in
+(no network access) covering the cases that matter for our IST/play-in
 exclusion logic: an unaffected team, an IST quarterfinal-round loser, an IST
-semifinalist, and a team that also played in the play-in tournament.
+semifinalist, and a team that also played in the play-in tournament - plus
+older seasons whose format differs: the 2019-20 COVID bubble, the 72-game
+2020-21 season (play-in games numbered below 82), and 2023-24 (IST labeled
+"In-Season Tournament" rather than "NBA Cup").
+
+The unlabeled fixtures are from 2025-26.
 """
 
 import os
@@ -48,3 +53,25 @@ def test_parsed_games_are_in_ascending_game_number_order():
     game_numbers = [g.game_number for g in games]
     assert game_numbers == sorted(game_numbers)
     assert game_numbers[0] == 1
+
+
+def test_bubble_season_playin_game_is_excluded():
+    """2019-20: the play-in was game 74 for Memphis - inside 1..82, so only its label marks it."""
+    games, true_opponents = _load_true_opponents("MEM_2019-20_bubble_playin_73.html")
+    assert len(games) == 74
+    assert len(true_opponents) == 73
+
+
+def test_shortened_season_playin_games_are_excluded():
+    """2020-21: a 72-game season, with the play-in as games 73-74."""
+    games, true_opponents = _load_true_opponents("GSW_2020-21_playin_72.html")
+    assert len(games) == 74
+    assert len(true_opponents) == 72
+
+
+def test_in_season_tournament_label_is_recognized():
+    """2023-24 labels IST games "In-Season Tournament"; LAL won it (2 knockout
+    games excluded) and also played in the play-in (1 more excluded)."""
+    games, true_opponents = _load_true_opponents("LAL_2023-24_ist_semifinalist_playin_80.html")
+    assert len(games) == 83
+    assert len(true_opponents) == 80
