@@ -71,4 +71,5 @@ SELECT
 	CAST(COUNT(*) AS integer) AS num_games,
 	CAST(SUM(profit_cents) AS integer) AS total_profit_cents
 FROM profit_per_game
-GROUP BY team, seasonStartYear, outcome, is_favorite, wager;
+GROUP BY team, seasonStartYear, outcome, is_favorite, wager
+ORDER BY outcome, is_favorite;

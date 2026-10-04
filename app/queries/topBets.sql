@@ -26,7 +26,7 @@ WITH top_bets AS (
 		WHERE seasonStartYear = $1 
 			AND team = $2
 			AND outcome = $3
-		ORDER BY odds DESC
+		ORDER BY odds DESC, game_number  -- ties: the earlier game, so results are stable
 		LIMIT 3
 )
 SELECT
@@ -40,4 +40,5 @@ SELECT
 			ELSE (wager/(odds * -1)) * 100
 		END
 	) AS integer) AS profit_cents
-FROM top_bets;
+FROM top_bets
+ORDER BY odds DESC, game_number;
