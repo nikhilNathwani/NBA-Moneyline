@@ -262,6 +262,17 @@ POSTGRES_URL=postgres://username:password@host/database
     mid-scrape failure is cheap - neither verification nor migration ever reads
     from these caches, and both are deleted automatically once a season migrates
     successfully
+-   **Game order (open question, worth investigating some time)**: Step 2.5 ignores
+    game order on purpose (decided 2026-07-16, commit `68dab74`) so postponed games
+    don't cause false alarms. The side effect is that a team's game numbers can differ
+    slightly from basketball-reference's order. A 2026-10-04 check of every season in
+    production found game counts and wins matching for all 30 teams in all 10 seasons,
+    and the game-by-game win/loss order matching in every season except 2025-26: there,
+    7 teams (ATL, BOS, DEN, HOU, IND, PHI, UTA) each have one pair of games in a
+    different order. Season totals are unaffected; only those games' "Game #" labels
+    (and the running-total line between them) differ. The cause isn't confirmed:
+    postponements are the likely explanation, but checking needs a re-scrape of
+    OddsPortal
 -   **Idempotent**: Safe to re-run if something goes wrong (deletes old data first)
 -   **Web App**: New season will automatically appear in dropdown after migration
 -   **Tests**: `pytest data/test/` runs the parsing/comparison logic against saved
