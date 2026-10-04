@@ -22,7 +22,9 @@ load_dotenv(os.path.join(ROOT, ".env.development.local"))
 OUTPUT = os.path.join(ROOT, "tableau", "games.csv")
 
 # Column aliases and row order here define the exact shape of games.csv the
-# workbook expects - don't change without re-checking the Tableau connection.
+# workbook expects - don't rename or reorder without re-checking the Tableau
+# connection. (Opponent, Game Date and Location were appended on 2026-10-04 and
+# aren't used by the dashboard yet; appending new columns is safe.)
 # Reads the team_games view: each game from both teams' sides, as the
 # dashboard uses it.
 QUERY = """
@@ -32,7 +34,11 @@ QUERY = """
         gamenumber      AS "Game Number",
         outcome::text   AS "Outcome",
         winodds         AS "Win Odds",
-        loseodds        AS "Lose Odds"
+        loseodds        AS "Lose Odds",
+        opponent        AS "Opponent",
+        game_date       AS "Game Date",
+        CASE is_home WHEN true THEN 'Home' WHEN false THEN 'Away' ELSE 'Neutral' END
+                        AS "Location"
     FROM team_games
     ORDER BY team, seasonstartyear, gamenumber
 """
