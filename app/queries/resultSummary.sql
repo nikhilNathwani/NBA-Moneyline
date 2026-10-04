@@ -21,8 +21,8 @@ WITH integer_odds AS (
 		outcome,
 		CAST($3 AS boolean) as prediction,
 		CAST($4 AS NUMERIC) AS wager,
-		CAST(REPLACE(winOdds,'+','') AS INTEGER) AS winOdds_int,
-		CAST(REPLACE(loseOdds,'+','') AS INTEGER) AS loseOdds_int
+		CAST(winOdds AS INTEGER) AS winOdds_int,
+		CAST(loseOdds AS INTEGER) AS loseOdds_int
 		FROM games
 		WHERE seasonStartYear = CAST($1 AS integer)
 			AND team = CAST($2 AS text)

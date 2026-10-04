@@ -16,6 +16,11 @@ function formatCentsToDollars(cents, includePlusSign = false) {
 	return amount;
 }
 
+// Moneyline odds with an explicit sign, e.g. 150 -> "+150", -200 -> "-200"
+function formatOdds(odds) {
+	return `${odds > 0 ? "+" : ""}${odds}`;
+}
+
 function formatPercent(number, includePlusSign = true) {
 	return `${number >= 0 ? "+" : ""}${number.toPrecision(3)}%`;
 

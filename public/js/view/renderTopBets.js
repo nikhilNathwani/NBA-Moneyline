@@ -59,7 +59,7 @@ function populateTopBets(topThreeBets, prediction, wager) {
 		populateResultElement({
 			element: gameTableOdds.querySelector("td"),
 			value: topThreeBets[index].odds,
-			textFormatFn: null,
+			textFormatFn: formatOdds,
 			applySignAndColor: false,
 		});
 

@@ -33,7 +33,7 @@ odds_as_int AS (
 		outcome,
 		wager,
 		odds_string,
-		CAST(REPLACE(odds_string,'+','') AS INTEGER) AS odds_int
+		CAST(odds_string AS INTEGER) AS odds_int
 	FROM odds_of_prediction
 ),
 top_bets AS (
@@ -45,7 +45,7 @@ top_bets AS (
 SELECT
 	game_number, 
 	outcome, 
-	odds_string as odds,
+	odds_int AS odds,
 	CAST(wager AS integer) AS wager,
 	CAST(FLOOR(
 		CASE 
