@@ -1,7 +1,7 @@
 """
 Fetches season-schedule pages from basketball-reference.com - the pipeline's
 second data source, alongside OddsPortal. Its official schedule is what
-validate/ checks opponents against and what standardize/ dates every game
+validate/ checks opponents against and what transform/ dates every game
 from. load_true_schedules is the entry point: fetch every team's page, then
 parse it (parser.py).
 
@@ -18,8 +18,8 @@ import urllib.request
 
 from typing import Dict, List, Optional
 
-from scrape.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
-from scrape.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
+from extract.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
+from extract.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
 REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits

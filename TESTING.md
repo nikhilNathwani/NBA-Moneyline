@@ -57,7 +57,7 @@ uv pip list
 ```bash
 cd data
 source .venv/bin/activate
-python3 -c "from scrape.odds.scraper import OddsPortalScraper; print('✅ Imports work')"
+python3 -c "from extract.odds.scraper import OddsPortalScraper; print('✅ Imports work')"
 ```
 
 **Expected:** "✅ Imports work" prints
@@ -67,7 +67,7 @@ python3 -c "from scrape.odds.scraper import OddsPortalScraper; print('✅ Import
 ```bash
 cd data
 source .venv/bin/activate
-python3 -c "from publish.migrate_to_production import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
+python3 -c "from load.migrate_to_production import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
 ```
 
 **Expected:** "✅ DB connected" prints

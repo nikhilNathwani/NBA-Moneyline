@@ -10,7 +10,7 @@ to migrate to production, two ways:
   is order-agnostic (multiset of opponents, not sequence): OddsPortal's
   listing order doesn't always match the real date order (in 2025-26 it
   listed five games a few places late), so this checks only *which*
-  opponents (and how many times each) a team played. standardize/matching.py
+  opponents (and how many times each) a team played. transform/matching.py
   then places every game on its real date.
 
 Both work directly on the scraper's in-memory output - there's no
@@ -21,7 +21,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List
 
-from scrape.schedules.parser import ScheduleGame
+from extract.schedules.parser import ScheduleGame
 from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 
@@ -113,7 +113,7 @@ def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]],
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (from scrape.schedules.fetcher.load_true_schedules).
+    authoritative schedule (from extract.schedules.fetcher.load_true_schedules).
     """
     results = []
     for team_full_name, true_games in schedules.items():

@@ -61,10 +61,10 @@ public/
 
 data/
   main.py                     # The whole pipeline, steps 1-6 in order
-  scrape/                     # Step 1: OddsPortal (odds) + basketball-reference (schedule)
+  extract/                    # Step 1: OddsPortal (odds) + basketball-reference (schedule)
   validate/                   # Step 2: check the scraped data
-  standardize/                # Step 3: one dated record per game
-  publish/                    # Steps 4-6: migrate to production, update frontend
+  transform/                  # Step 3: one dated record per game
+  load/                       # Steps 4-6: load into production, update frontend
   util/                       # Shared data model, constants, and output formatting
   tests/                      # pytest suite, mirroring the folders above
   sample_queries.sql          # SQL for inspecting the database by hand
@@ -122,13 +122,13 @@ npm run sync-env
 
 The `data/` directory contains the yearly ingestion flow:
 
-1. **Scrape** one season: odds and results from OddsPortal, and the official
+1. **Extract** one season: odds and results from OddsPortal, and the official
    schedule (dates, home/away) from basketball-reference
 2. **Validate**: game counts against that season's expected pattern, and every
    team's opponents against the official schedule
-3. **Standardize**: match every game to the official schedule, turning two
+3. **Transform**: match every game to the official schedule, turning two
    scraped rows per game into one record with its real date and home team
-4. **Migrate** into PostgreSQL (`teams`, one row per game in `games`, and a
+4. **Load** into PostgreSQL (`teams`, one row per game in `games`, and a
    `team_games` view the app reads) in one all-or-nothing transaction, only with
    all checks passing or an explicit override; the tables' constraints reject bad
    rows too
@@ -148,7 +148,7 @@ a data-analyst-portfolio rebuild of the same simulator.
 
 To edit: open the `.twbx` from this folder (not Tableau's default Workbooks folder) so the repo stays the source of truth, and re-publish to Tableau Public from here (same workbook name → replaces the existing viz, URL preserved). Custom team-logo shapes live in `~/Documents/My Tableau Repository/Shapes/NBA/` (Tableau requires shape sources there); the published `.twbx` bundles them.
 
-Annual data refresh: `python3 data/publish/export_tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
+Annual data refresh: `python3 data/load/export_tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
 
 ## Testing and Validation
 

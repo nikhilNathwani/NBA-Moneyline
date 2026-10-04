@@ -27,7 +27,7 @@ from datetime import date, datetime
 from typing import Dict, List
 
 from util.game import Game
-from scrape.schedules.parser import AWAY, NEUTRAL, ScheduleGame
+from extract.schedules.parser import AWAY, NEUTRAL, ScheduleGame
 
 MAX_POSITION_GAP = 8
 

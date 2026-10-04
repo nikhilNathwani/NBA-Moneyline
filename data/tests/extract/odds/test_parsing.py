@@ -1,5 +1,5 @@
 """
-Tests for the pure HTML-parsing functions in scrape.odds.parser: page
+Tests for the pure HTML-parsing functions in extract.odds.parser: page
 structure parsing (game rows, pagination), page-quality counting,
 row-level odds/winner extraction (with its fallback signal), team-name
 extraction, and detail-page odds extraction. No network, no Selenium -
@@ -9,7 +9,7 @@ in hand.
 
 from bs4 import BeautifulSoup
 
-from scrape.odds.parser import (
+from extract.odds.parser import (
     getLastPageNum, parseGameRows, countGameDataRows,
     extractGameRowAndTeamNames, extractOddsAndWinnerFromRow, RowOddsResult,
     findDetailPageLink, extractOddsFromDetailHtml,

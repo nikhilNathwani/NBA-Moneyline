@@ -3,15 +3,15 @@
 NBA Moneyline Data Pipeline - Main Script
 
 This script orchestrates the complete workflow:
-1. Scrape the season: odds and results from OddsPortal, and the official
-   schedule (dates, home/away) from basketball-reference       - scrape/
+1. Extract the season: odds and results from OddsPortal, and the
+   official schedule (dates, home/away) from basketball-reference  - extract/
 2. Validate: game counts per team, and every team's opponents
-   against the official schedule                                - validate/
-3. Standardize: turn the scraper's two rows per game into one
-   record per real game, dated from the official schedule       - standardize/
-4. Confirm, then migrate to the Vercel Postgres database       - publish/
-5. Update frontend seasons list and push to git                - publish/
-6. Verify migration was successful                             - publish/
+   against the official schedule                                    - validate/
+3. Transform: turn the scraper's two rows per game into one
+   record per real game, dated from the official schedule           - transform/
+4. Confirm, then load into the Vercel Postgres database            - load/
+5. Update frontend seasons list and push to git                    - load/
+6. Verify the load was successful                                  - load/
 
 One season per run, by design - catching up multiple seasons after a gap
 just means running this multiple times. OddsPortal is already slow and
@@ -48,15 +48,15 @@ def check_requirements():
 
 check_requirements()
 
-from scrape.odds.scraper import OddsPortalScraper
-from scrape.schedules.fetcher import load_true_schedules
+from extract.odds.scraper import OddsPortalScraper
+from extract.schedules.fetcher import load_true_schedules
 from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
-from standardize.matching import match_to_schedule, MatchError
-from publish.migrate_to_production import (
+from transform.matching import match_to_schedule, MatchError
+from load.migrate_to_production import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
-from publish.update_frontend import (
+from load.update_frontend import (
     update_seasons_list,
     commit_and_push_changes
 )
@@ -75,7 +75,7 @@ DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Complete NBA Moneyline data pipeline: scrape, verify, and migrate',
+        description='NBA Moneyline data pipeline: extract, validate, transform, and load one season',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
@@ -109,9 +109,9 @@ def main():
     schedules = None
     schedules_error = None
 
-    # Step 1: Scrape both sources - OddsPortal (odds and results) and
+    # Step 1: Extract from both sources - OddsPortal (odds and results) and
     # basketball-reference (the official schedule: dates and home/away)
-    print_section_header(f"STEP 1: SCRAPING {season_str} SEASON")
+    print_section_header(f"STEP 1: EXTRACTING {season_str} SEASON")
 
     print("📥 OddsPortal (odds and results)\n")
     scraper = OddsPortalScraper(headless=args.headless)
@@ -157,9 +157,9 @@ def main():
                 failed_checks.append(f"{len(mismatched)} teams' opponents don't match "
                                      f"basketball-reference (Step 2)")
 
-            # Step 3: Standardize - turn the scraper's two rows per game into
+            # Step 3: Transform - turn the scraper's two rows per game into
             # one record per real game, dated from basketball-reference
-            print_section_header("STEP 3: STANDARDIZING: ONE DATED RECORD PER GAME")
+            print_section_header("STEP 3: TRANSFORMING: ONE DATED RECORD PER GAME")
             try:
                 match = match_to_schedule(season_games, schedules)
                 records = match.records
@@ -172,7 +172,7 @@ def main():
 
         # Step 4: Prompt for migration - a plain Y/Enter only when every check
         # passed; otherwise migrating takes typing an explicit override.
-        print_section_header("STEP 4: MIGRATION TO VERCEL POSTGRES")
+        print_section_header("STEP 4: LOADING INTO VERCEL POSTGRES")
 
         if cannot_migrate:
             print(f"❌ Can't migrate {season_str}: {cannot_migrate}.")

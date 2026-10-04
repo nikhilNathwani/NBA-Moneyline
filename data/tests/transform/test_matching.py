@@ -1,5 +1,5 @@
 """
-Tests for standardize.matching using a small synthetic season (no network):
+Tests for transform.matching using a small synthetic season (no network):
 four teams, three game days, built both as basketball-reference schedules
 and as scraper output.
 """
@@ -9,8 +9,8 @@ import datetime
 import pytest
 
 from util.game import Game
-from standardize.matching import MatchError, match_to_schedule
-from scrape.schedules.parser import AWAY, HOME, NEUTRAL, ScheduleGame
+from transform.matching import MatchError, match_to_schedule
+from extract.schedules.parser import AWAY, HOME, NEUTRAL, ScheduleGame
 
 # (date, home, away, home_won, home_odds, away_odds, neutral)
 SEASON = [

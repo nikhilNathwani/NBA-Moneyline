@@ -8,26 +8,26 @@ the Tableau dashboard read. It runs once a year, after a regular season ends.
 
 ```
 data/
-  main.py           The whole pipeline, steps 1-6 in order - start here
-  scrape/           Step 1: get the season from both sources
-    odds/             OddsPortal: odds and results, two rows per game
-                      (scraper.py drives the browser; parser.py is the pure
-                      HTML parsing)
-    schedules/        basketball-reference: the official schedule - dates,
-                      home/away (fetcher.py downloads, parser.py parses)
-  validate/         Step 2: check the scraped data against expectations and the
-                    official schedule (verification.py)
-  standardize/      Step 3: turn the two rows per game into one record per real
-                    game, dated from the official schedule (matching.py)
-  publish/          Steps 4-6: migrate to Postgres, update the web app's season
-                    list, final check; plus the Tableau CSV export
-  util/             Shared pieces: the Game record, expected game counts per
-                    season (constants.py), console output
-  tests/            The pytest suite - checks the *code*, never runs during the
-                    pipeline. Mirrors the folders above
+  main.py             The whole pipeline, steps 1-6 in order - start here
+  extract/            Step 1: get the season from both sources
+    odds/               OddsPortal: odds and results, two rows per game
+                        (scraper.py drives the browser; parser.py is the pure
+                        HTML parsing)
+    schedules/          basketball-reference: the official schedule - dates,
+                        home/away (fetcher.py downloads, parser.py parses)
+  validate/           Step 2: check the scraped data against expectations and
+                      the official schedule (verification.py)
+  transform/          Step 3: turn the two rows per game into one record per
+                      real game, dated from the official schedule (matching.py)
+  load/               Steps 4-6: load into Postgres, update the web app's season
+                      list, final check; plus the Tableau CSV export
+  util/               Shared pieces: the Game record, expected game counts per
+                      season (constants.py), console output
+  tests/              The pytest suite - checks the *code*, never runs during
+                      the pipeline. Mirrors the folders above
   sample_queries.sql  Handy SQL for inspecting the database by hand
-  .python-version   The Python version the venv is built with (read by uv)
-  pytest.ini        Lets tests import the code the way main.py does
+  .python-version     The Python version the venv is built with (read by uv)
+  pytest.ini          Lets tests import the code the way main.py does
 ```
 
 (`.python-version` and `pytest.ini` are hidden in this project's VS Code sidebar;
@@ -78,7 +78,7 @@ python3 main.py --season 2025 --headless # same, without a visible browser windo
 One season per run, by design: catching up after a gap means one run per season
 (see the note at the top of `main.py` for why). Other options: `python3 main.py --help`.
 
-### Step 1: Scrape both sources
+### Step 1: Extract from both sources
 
 -   **OddsPortal**: opens Chrome on its NBA results pages and scrapes every game of
     the season into memory, two rows per game (one per team). Each page is checked
@@ -123,11 +123,11 @@ Then every team's scraped opponents against the official schedule:
 A mismatch lists the exact missing/extra opponents for that team. This
 comparison ignores order; Step 3 handles order.
 
-### Step 3: Standardize
+### Step 3: Transform
 
 Every game is matched to its entry on basketball-reference's schedule, which turns
 the scraper's two rows into one record with the game's real date and home team
-(`standardize/matching.py`):
+(`transform/matching.py`):
 
 ```
 📅 Matched all 1224 games to their dates on basketball-reference
@@ -139,7 +139,7 @@ out of date order (it did for 2025-26) still match, and their game numbers come
 from the real dates. If any game can't be matched to exactly one pair of rows, it
 says which, and the season can't be migrated - nothing is guessed.
 
-### Step 4: Confirm and migrate
+### Step 4: Confirm and load
 
 If every check passed:
 
@@ -192,7 +192,7 @@ The dashboard (`tableau/NBA Moneyline.twbx`) reads `tableau/games.csv`, which th
 migration does **not** update:
 
 ```bash
-python3 data/publish/export_tableau_csv.py   # from the project root: regenerates tableau/games.csv
+python3 data/load/export_tableau_csv.py   # from the project root: regenerates tableau/games.csv
 git add tableau/games.csv && git commit -m "Add <season> to Tableau data export"
 ```
 
@@ -262,7 +262,7 @@ won), `winodds`, `loseodds` (= the opponent's `winodds`), `opponent`, `game_date
 saved query over `games` and `teams`, so it can't drift from them.
 
 Whole-season rules (all 30 teams play, no team plays twice on one date) span many
-rows, so the migration checks them (`publish/migrate_to_production.py`).
+rows, so the migration checks them (`load/migrate_to_production.py`).
 
 History (2026-10-04):
 -   The odds columns changed from text (`"+150"`) to integer, and the table got its
