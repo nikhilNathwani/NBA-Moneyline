@@ -22,7 +22,7 @@ WITH top_bets AS (
 			WHEN $3 = TRUE THEN winOdds
 			ELSE loseOdds
 		END AS odds
-		FROM games
+		FROM team_games
 		WHERE seasonStartYear = $1 
 			AND team = $2
 			AND outcome = $3

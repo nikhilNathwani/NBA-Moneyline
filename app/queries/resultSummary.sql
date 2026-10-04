@@ -24,7 +24,7 @@ WITH label_favorites AS (
 		winOdds < 0 AS is_favorite,
 		CAST($3 AS boolean) as prediction,
 		CAST($4 AS NUMERIC) AS wager
-		FROM games
+		FROM team_games
 		WHERE seasonStartYear = CAST($1 AS integer)
 			AND team = CAST($2 AS text)
 ),
