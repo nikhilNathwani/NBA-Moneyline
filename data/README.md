@@ -80,14 +80,18 @@ One season per run, by design: catching up after a gap means one run per season
 
 ### Step 1: Extract from both sources
 
--   **OddsPortal**: opens Chrome on its NBA results pages and scrapes every game of
-    the season into memory, two rows per game (one per team). Each page is checked
-    for being fully loaded, retried up to 5 times if not, and cached once it passes
-    (see "scrape aborted mid-run" below).
--   **basketball-reference**: downloads every team's official schedule (play-in and
-    tournament knockout games excluded) - the source of each game's date and home
-    team, and what Step 2 checks opponents against. This needs network access to
-    basketball-reference.com: without it the season can't be migrated, since the
+-   **OddsPortal**: opens Chrome on the season's NBA results pages and reads every
+    regular-season game (two rows per game, one per team), switching the site to
+    American odds first. Each page is retried up to 3 times if it doesn't fully
+    load, and cached once it passes (see "scrape aborted mid-run" below). From
+    2023-24 on it also reads the NBA Cup page, because OddsPortal lists the
+    tournament's quarterfinals and semifinals there instead of with the NBA results;
+    they count toward the 82-game season (the final doesn't, and is left out). A
+    game listed without odds gets the average of the bookmakers on its own page.
+-   **basketball-reference**: downloads every team's official schedule (play-in
+    games excluded) - the source of each game's date and home team, and what
+    Step 2 checks opponents against. This needs network access to
+    basketball-reference.com: without it the season can't be loaded, since the
     database needs each game's date.
 
 ### Step 2: Validate
@@ -96,21 +100,19 @@ First, each team's game count against that season's expected pattern
 (`util/constants.py`), with an explicit pass/fail:
 
 ```
-✅ Total team-game rows scraped: 2448 (expected 2448; 2 per game)
+✅ Total team-game rows scraped: 2460 (expected 2460; 2 per game)
 
 📋 Games Per Team:
   Atlanta Hawks................................. 82 games
   [... all 30 teams ...]
 
-✅ Per-team distribution matches expectations: 22 teams @ 82, 4 teams @ 81, 4 teams @ 80
+✅ Per-team distribution matches expectations: 30 teams @ 82
 ```
 
--   The scraper produces two rows per game, one per team, so 2,448 rows = 1,224 games.
--   Since 2023-24, 8 teams finish below 82: in-season tournament (NBA Cup) knockout
-    games are excluded, so the 4 semifinalists land on 80 and the 4 quarterfinal
-    losers on 81. Which teams is detected each season, not hardcoded.
--   Older seasons are checked against their own format: all 30 at 82 before
-    2023-24, all 30 at 72 in 2020-21. 2019-20 (the COVID bubble) has no fixed
+-   The scraper produces two rows per game, one per team, so 2,460 rows = 1,230 games.
+-   Seasons are checked against their own format: all 30 at 82 normally (since
+    2023-24 that includes the NBA Cup quarterfinals and semifinals), all 30 at 72
+    in 2020-21. 2019-20 (the COVID bubble) has no fixed
     pattern, so the count check doesn't apply and the opponent check below is the
     check.
 
@@ -130,13 +132,14 @@ the scraper's two rows into one record with the game's real date and home team
 (`transform/build_game_records.py`):
 
 ```
-📅 Matched all 1224 games to their dates on basketball-reference
+📅 Matched all 1230 games to their dates on basketball-reference
 ```
 
 The match needs both teams' rows to agree: right opponents, right winner, mirrored
-odds, and close to the right place in each team's schedule. Games OddsPortal lists
-out of date order (it did for 2025-26) still match, and their game numbers come
-from the real dates. If any game can't be matched to exactly one pair of rows, it
+odds, close to the right place in each team's schedule, and within a day of the
+real date (OddsPortal's dates can run a day ahead). Games listed out of date order,
+a team with a game missing, and the same teams on consecutive days all still match,
+and game numbers come from the real dates. If any game can't be matched to exactly one pair of rows, it
 says which, and the season can't be migrated - nothing is guessed.
 
 ### Step 4: Confirm and load
@@ -181,9 +184,9 @@ Vercel.
 📊 Games Per Season in Database:
   2016-17:......................................... 1230 games
   ...
-  2025-26:......................................... 1224 games
+  2025-26:......................................... 1230 games
   ─────────────────────────────────────────────────────────
-  TOTAL:........................................... 11961 games
+  TOTAL:........................................... 11979 games
 ```
 
 ### Afterwards: refresh the Tableau dashboard
@@ -272,6 +275,11 @@ History (2026-10-04):
     old row was matched to its real game on basketball-reference, confirmed by
     mirrored odds and winners, without re-scraping OddsPortal. The values were
     unchanged except 26 game numbers in 2025-26 (see Notes).
+-   The NBA Cup quarterfinals and semifinals for 2023-24, 2024-25 and 2025-26 (6
+    per season, 18 games) were added, so every team in those seasons has 82 games.
+    They were scraped from OddsPortal's NBA Cup pages and loaded through the same
+    checks; no existing game was changed. Their odds are OddsPortal's averages as of
+    that date (from 1, 2 and 3 bookmakers respectively - see Notes).
 
 The web app reads these live, so for any structural change, deploy app code that
 works with both the old and new structure first, then change the database.
@@ -283,7 +291,9 @@ works with both the old and new structure first, then change the database.
 -   Check the regular season is actually complete.
 -   The opponent check's output names the specific teams and opponents that are off - much
     faster than reading raw counts.
--   Some end-of-season games may not have odds on OddsPortal.
+-   A game OddsPortal lists without odds is filled from its own page (the average
+    of the bookmakers there); if that page has none either, the game is skipped and
+    shows up here as missing. Check the game on OddsPortal.
 
 ### "N consecutive pages failed to render" / scrape aborted mid-run
 
@@ -294,13 +304,14 @@ works with both the old and new structure first, then change the database.
 -   A re-run resumes: every page that loaded successfully is cached in
     `data/.oddsportal_cache/`. The cache is deleted once that season migrates.
 -   If it keeps happening after a real wait, check in a normal browser whether
-    OddsPortal's site structure changed.
+    OddsPortal's site structure changed (it was redesigned in 2026, which needed a
+    scraper rewrite).
 
-### Missing or invalid odds warnings
+### Odds errors
 
--   Review the games mentioned; you may need to check them on OddsPortal.
--   Rows that needed the detail-page fallback have their HTML saved in
-    `data/.oddsportal_cache/<season>/debug/` (deleted with the cache).
+-   "odds ... aren't in American format" means OddsPortal's odds-format setting
+    didn't take (the scraper sets it in the browser's local storage as
+    `op_oddsFormatId=3`); OddsPortal may have changed how it stores it.
 -   Scraped data only lives in memory during a run: decline at Step 4, fix the
     scraper, and re-run rather than patching data mid-run.
 
@@ -326,6 +337,15 @@ works with both the old and new structure first, then change the database.
     Postgres is the only source of truth. The page caches (`data/.oddsportal_cache/`,
     `data/.bbref_cache/`) exist only so a failed run can resume cheaply - nothing
     reads data from them - and are deleted after a successful migration.
+-   **OddsPortal's odds aren't fixed over time**: they're averages across the
+    bookmakers OddsPortal has on record for each game, and that set changes - as of
+    October 2026 it was 1 bookmaker for 2023-24 games and 4 for 2025-26. Re-scraping
+    2025-26 three months after it was loaded gave identical odds for only 101 of
+    1,224 games, though the gaps were small (a median of 0.6 percentage points of
+    implied win probability, at most 2.3). So each season's odds are a snapshot of
+    when it was scraped (per git history: 2022-23 to 2024-25 in November 2025,
+    2025-26 in July 2026, the 18 NBA Cup games in October 2026; earlier seasons
+    before that).
 -   **OddsPortal's listing order isn't always date order**: for 2025-26, five
     games (BOS-MIN Nov 29, ATL-PHI Dec 14, POR-UTA Jan 5, ATL-IND Jan 26, DEN-HOU
     Mar 11) were listed 1-3 places later than when they were played, so the old

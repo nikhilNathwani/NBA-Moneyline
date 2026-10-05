@@ -148,7 +148,7 @@ a data-analyst-portfolio rebuild of the same simulator.
 
 To edit: open the `.twbx` from this folder (not Tableau's default Workbooks folder) so the repo stays the source of truth, and re-publish to Tableau Public from here (same workbook name → replaces the existing viz, URL preserved). Custom team-logo shapes live in `~/Documents/My Tableau Repository/Shapes/NBA/` (Tableau requires shape sources there); the published `.twbx` bundles them.
 
-Annual data refresh: `python3 data/load/export_tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
+Annual data refresh: `python3 data/load/tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
 
 ## Testing and Validation
 

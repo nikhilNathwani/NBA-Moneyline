@@ -67,7 +67,7 @@ python3 -c "from extract.oddsportal.scraper import OddsPortalScraper; print('✅
 ```bash
 cd data
 source .venv/bin/activate
-python3 -c "from load.migrate_to_production import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
+python3 -c "from load.postgres import get_postgres_connection; conn = get_postgres_connection(); print('✅ DB connected'); conn.close()"
 ```
 
 **Expected:** "✅ DB connected" prints
