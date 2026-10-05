@@ -226,7 +226,7 @@ class OddsPortalScraper:
     def _fill_missing_odds(self, rows: List[ResultRow]):
         """For played games the results page lists without odds, take the
         average of the bookmakers on the game's own page. Rows it can't fill
-        stay without odds (build_team_games skips them, and Step 2 flags it)."""
+        stay without odds (build_team_games skips them, and the extract checks flag it)."""
         for row in rows:
             if row.home_odds is not None or row.home_score is None or not row.link:
                 continue
@@ -295,7 +295,7 @@ class OddsPortalScraper:
         print(f"\n{'='*60}")
         print(f"Total games scraped: {team_rows // 2}")
         print(f"Total team-game rows (2 per game): {team_rows}")
-        print(f"(Step 2 checks these against the expected counts)")
+        print(f"(checked against the expected counts below)")
         print(f"{'='*60}\n")
         return games
 

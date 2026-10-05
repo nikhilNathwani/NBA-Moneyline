@@ -60,11 +60,10 @@ public/
     view/                     # Result rendering
 
 data/
-  main.py                     # The whole pipeline, steps 1-6 in order
-  extract/                    # Step 1: OddsPortal (odds) + basketball-reference (schedule)
-  validate/                   # Step 2: check the scraped data
-  transform/                  # Step 3: one dated record per game
-  load/                       # Steps 4-6: load into production, update frontend
+  main.py                     # The whole pipeline: extract, transform, load
+  extract/                    # Step 1: OddsPortal (odds) + basketball-reference (schedule), then checks
+  transform/                  # Step 2: one dated record per game
+  load/                       # Step 3: load into production, update frontend
   util/                       # Shared data model, constants, and output formatting
   tests/                      # pytest suite, mirroring the folders above
   sample_queries.sql          # SQL for inspecting the database by hand
@@ -123,16 +122,15 @@ npm run sync-env
 The `data/` directory contains the yearly ingestion flow:
 
 1. **Extract** one season: odds and results from OddsPortal, and the official
-   schedule (dates, home/away) from basketball-reference
-2. **Validate**: game counts against that season's expected pattern, and every
-   team's opponents against the official schedule
-3. **Transform**: match every game to the official schedule, turning two
+   schedule (dates, home/away) from basketball-reference - then check it: game
+   counts against that season's expected pattern, and every team's opponents
+   against the official schedule
+2. **Transform**: match every game to the official schedule, turning two
    scraped rows per game into one record with its real date and home team
-4. **Load** into PostgreSQL (`teams`, one row per game in `games`, and a
+3. **Load** into PostgreSQL (`teams`, one row per game in `games`, and a
    `team_games` view the app reads) in one all-or-nothing transaction, only with
    all checks passing or an explicit override; the tables' constraints reject bad
-   rows too
-5. Update frontend season options
+   rows too - then update the web app's season options
 
 See [`data/README.md`](data/README.md) for setup, the yearly run, and troubleshooting.
 

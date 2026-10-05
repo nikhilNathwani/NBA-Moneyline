@@ -4,7 +4,7 @@ Console output formatting utilities for the NBA Moneyline data pipeline.
 
 from typing import Dict, List
 
-from validate.checks import TeamScheduleComparison
+from extract.checks import TeamScheduleComparison
 
 
 def print_section_header(title: str):
@@ -15,14 +15,14 @@ def print_section_header(title: str):
 
 
 def print_game_count_results(season: int, results: Dict):
-    """Print the game-count check (Step 2)."""
+    """Print the game-count check (Step 1)."""
     print_section_header(f"VERIFICATION RESULTS - {season}-{(season+1)%100:02d} Season")
 
     distribution = results['expected_distribution']
     if distribution is None:
         print(f"ℹ️  Total team-game rows scraped: {results['total_games']} (2 per game)")
         print(f"ℹ️  No fixed game-count expectation for this season (see util/constants.py) - "
-              f"the schedule validation in Step 2.5 is the check.\n")
+              f"the opponent check below is the check.\n")
     else:
         status = "✅" if results['total_games_ok'] else "❌"
         print(f"{status} Total team-game rows scraped: {results['total_games']} "

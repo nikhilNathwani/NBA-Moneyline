@@ -8,18 +8,19 @@ the Tableau dashboard read. It runs once a year, after a regular season ends.
 
 ```
 data/
-  main.py             The whole pipeline, steps 1-6 in order - start here
-  extract/            Step 1: get the season from both sources
+  main.py             The whole pipeline - extract, transform, load - start here
+  extract/            Step 1: get the season from both sources, and check it
     oddsportal/           OddsPortal: odds and results, two rows per game
     basketball_reference/ the official schedule - dates, home/away
                         Each has scraper.py (gets the pages; OddsPortal's needs a
                         real browser) and parser.py (reads them - pure, tested
                         against saved pages)
-  validate/           Step 2: check the scraped data against expectations and
-                      the official schedule (checks.py)
-  transform/          Step 3: turn the two rows per game into one record per
+    checks.py           the checks the scraped data must pass before anything is
+                        transformed: game counts, and opponents vs. the official
+                        schedule
+  transform/          Step 2: turn the two rows per game into one record per
                       real game, dated from the official schedule (build_game_records.py)
-  load/               Steps 4-6: load into Postgres, update the web app's season
+  load/               Step 3: load into Postgres, update the web app's season
                       list, final check; plus the Tableau CSV export
   util/               Shared pieces: the two game records (records.py - one
                       team's side of a game, and one real game), constants
@@ -35,8 +36,8 @@ data/
 (`.python-version` and `pytest.ini` are hidden in this project's VS Code sidebar;
 they're set-and-forget.)
 
-`validate/` vs. `tests/`: `validate/` is part of the pipeline and checks each
-season's *data* every run; `tests/` checks that the code itself works.
+`extract/checks.py` vs. `tests/`: the checks are part of the pipeline and check
+each season's *data* every run; `tests/` checks that the code itself works.
 
 To poke at the database by hand, `sample_queries.sql` has ready-made queries
 (seasons, a team's season, records against each opponent, structure, sizes).
@@ -80,7 +81,10 @@ python3 main.py --season 2025 --headless # same, without a visible browser windo
 One season per run, by design: catching up after a gap means one run per season
 (see the note at the top of `main.py` for why). Other options: `python3 main.py --help`.
 
-### Step 1: Extract from both sources
+### Step 1: Extract
+
+**Scrape both sources:**
+
 
 -   **OddsPortal**: opens Chrome on the season's NBA results pages and reads every
     regular-season game (two rows per game, one per team), switching the site to
@@ -92,13 +96,12 @@ One season per run, by design: catching up after a gap means one run per season
     game listed without odds gets the average of the bookmakers on its own page.
 -   **basketball-reference**: downloads every team's official schedule (play-in
     games excluded) - the source of each game's date and home team, and what
-    Step 2 checks opponents against. This needs network access to
+    the checks below compare opponents against. This needs network access to
     basketball-reference.com: without it the season can't be loaded, since the
     database needs each game's date.
 
-### Step 2: Validate
-
-First, each team's game count against that season's expected pattern
+**Then check the scraped data** (`extract/checks.py`) before anything is
+transformed. First, each team's game count against that season's expected pattern
 (`util/constants.py`), with an explicit pass/fail:
 
 ```
@@ -125,9 +128,9 @@ Then every team's scraped opponents against the official schedule:
 ```
 
 A mismatch lists the exact missing/extra opponents for that team. This
-comparison ignores order; Step 3 handles order.
+comparison ignores order; Step 2 handles order.
 
-### Step 3: Transform
+### Step 2: Transform
 
 Every game is matched to its entry on basketball-reference's schedule, which turns
 the scraper's two rows into one record with the game's real date and home team
@@ -144,7 +147,9 @@ a team with a game missing, and the same teams on consecutive days all still mat
 and game numbers come from the real dates. If any game can't be matched to exactly one pair of rows, it
 says which, and the season can't be migrated - nothing is guessed.
 
-### Step 4: Confirm and load
+### Step 3: Load
+
+**Confirm and load into Postgres:**
 
 If every check passed:
 
@@ -157,7 +162,7 @@ If a check failed, it lists what failed and migrating takes typing
 
 ```
 ❌ Not all checks passed for 2025-26:
-    - game counts don't match the expected distribution (Step 2)
+    - game counts don't match the expected distribution (Step 1 checks)
 
 Type 'migrate anyway' to migrate 2025-26 regardless, or press Enter to cancel:
 ```
@@ -174,13 +179,13 @@ twice on one date. It's all one transaction, so any failure leaves production
 exactly as it was, and the tables' own constraints (see [The database](#the-database))
 reject bad rows the same way. Re-running a season is safe.
 
-### Step 5: Update the web app
+**Update the web app:**
 
 Adds the season to the web app's dropdown (`public/js/view/renderFilters.js`),
 then commits and pushes ("Add 2025-26 season to web app"), which deploys it on
 Vercel.
 
-### Step 6: Final database check
+**Final database check:**
 
 ```
 📊 Games Per Season in Database:
@@ -240,6 +245,13 @@ read its definitions live); update this section when you change it.*
 Written by the pipeline, read by the web app (`app/queries/`) and the Tableau export.
 (The same Postgres database also holds Titan Tracker's three `titan*` tables.)
 
+Logins: the app and pipeline connect as `default` (owns the tables).
+`moneyline_ci` is CI's login (the `CI_POSTGRES_URL` GitHub secret): it can read
+table definitions for the migration tests, but no rows, and can't write.
+Titan Tracker's `titan_editor` has no access to these tables - but it has a
+default grant on every *new* table `default` creates, so after adding a table here,
+run `REVOKE ALL ON <table> FROM titan_editor`.
+
 **`teams`**: one row per franchise.
 
 | Column | Type | Meaning |
@@ -292,7 +304,7 @@ works with both the old and new structure first, then change the database.
 
 ## Troubleshooting
 
-### Game counts or opponents don't match (Step 2)
+### Game counts or opponents don't match (Step 1 checks)
 
 -   Check the regular season is actually complete.
 -   The opponent check's output names the specific teams and opponents that are off - much
@@ -318,7 +330,7 @@ works with both the old and new structure first, then change the database.
 -   "odds ... aren't in American format" means OddsPortal's odds-format setting
     didn't take (the scraper sets it in the browser's local storage as
     `op_oddsFormatId=3`); OddsPortal may have changed how it stores it.
--   Scraped data only lives in memory during a run: decline at Step 4, fix the
+-   Scraped data only lives in memory during a run: decline at the Step 3 prompt, fix the
     scraper, and re-run rather than patching data mid-run.
 
 ### Migration fails

@@ -1,7 +1,6 @@
 """
 Publishes verified games to the production database (Postgres) that the
-web app reads from - migrates them over (Step 3) and verifies the
-migration (Step 5).
+web app reads from - loads them (Step 3) and checks the result.
 
 Writes one row per real game to the `games` table; the web app and the
 Tableau export read the `team_games` view, which presents each game from

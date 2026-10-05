@@ -2,16 +2,15 @@
 """
 NBA Moneyline Data Pipeline - Main Script
 
-This script orchestrates the complete workflow:
-1. Extract the season: odds and results from OddsPortal, and the
-   official schedule (dates, home/away) from basketball-reference  - extract/
-2. Validate: game counts per team, and every team's opponents
-   against the official schedule                                    - validate/
-3. Transform: turn the scraper's two rows per game into one
-   record per real game, dated from the official schedule           - transform/
-4. Confirm, then load into the Vercel Postgres database            - load/
-5. Update frontend seasons list and push to git                    - load/
-6. Verify the load was successful                                  - load/
+This script runs the whole pipeline, one stage per folder:
+1. Extract (extract/): scrape the season - odds and results from OddsPortal,
+   the official schedule (dates, home/away) from basketball-reference - then
+   check it: game counts per team, and every team's opponents against the
+   official schedule
+2. Transform (transform/): turn the scraper's two rows per game into one
+   record per real game, dated from the official schedule
+3. Load (load/): confirm, then load into the Vercel Postgres database, update
+   the web app's seasons list (and push to git), and check the result
 
 One season per run, by design - catching up multiple seasons after a gap
 just means running this multiple times. OddsPortal is already slow and
@@ -50,7 +49,7 @@ check_requirements()
 
 from extract.oddsportal import scraper as oddsportal
 from extract.basketball_reference import scraper as basketball_reference
-from validate.checks import check_game_counts, check_opponents
+from extract.checks import check_game_counts, check_opponents
 from transform.build_game_records import match_to_schedule, MatchError
 from load.postgres import (
     verify_postgres_migration,
@@ -111,7 +110,7 @@ def main():
 
     # Step 1: Extract from both sources - OddsPortal (odds and results) and
     # basketball-reference (the official schedule: dates and home/away)
-    print_section_header(f"STEP 1: EXTRACTING {season_str} SEASON")
+    print_section_header(f"STEP 1: EXTRACT - SCRAPING THE {season_str} SEASON")
 
     print("📥 OddsPortal (odds and results)\n")
     try:
@@ -129,8 +128,8 @@ def main():
             schedules_error = f"{e.__class__.__name__}: {e}"
             print(f"❌ Couldn't download basketball-reference's schedule ({schedules_error})")
 
-        # Step 2: Validate the scraped data
-        print_section_header("STEP 2: VALIDATING SCRAPED DATA")
+        # Step 1 (cont.): check the scraped data before anything is transformed
+        print_section_header("STEP 1: EXTRACT - CHECKING THE SCRAPED DATA")
 
         count_results = check_game_counts(season_games, season)
         print_game_count_results(season, count_results)
@@ -139,9 +138,9 @@ def main():
         # override (the data might still be right and the expectation wrong)
         failed_checks = []
         if count_results['distribution_ok'] is False or count_results['total_games_ok'] is False:
-            failed_checks.append("game counts don't match the expected distribution (Step 2)")
+            failed_checks.append("game counts don't match the expected distribution (Step 1 checks)")
         # Set if migrating is impossible, not just unadvised: the games
-        # table needs each game's date, which only Step 3 provides
+        # table needs each game's date, which only Step 2 provides
         cannot_migrate = None
         records = None
 
@@ -154,11 +153,11 @@ def main():
             mismatched = [c for c in schedule_comparisons if not c.ok]
             if mismatched:
                 failed_checks.append(f"{len(mismatched)} teams' opponents don't match "
-                                     f"basketball-reference (Step 2)")
+                                     f"basketball-reference (Step 1 checks)")
 
-            # Step 3: Transform - turn the scraper's two rows per game into
+            # Step 2: Transform - turn the scraper's two rows per game into
             # one record per real game, dated from basketball-reference
-            print_section_header("STEP 3: TRANSFORMING: ONE DATED RECORD PER GAME")
+            print_section_header("STEP 2: TRANSFORM - ONE DATED RECORD PER GAME")
             try:
                 match = match_to_schedule(season_games, schedules)
                 records = match.records
@@ -169,9 +168,9 @@ def main():
                 print(f"\n❌ Couldn't match every game to basketball-reference's schedule: {e}")
                 cannot_migrate = f"not every game could be matched to its date ({e})"
 
-        # Step 4: Prompt for migration - a plain Y/Enter only when every check
+        # Step 3: Load - prompt for migration - a plain Y/Enter only when every check
         # passed; otherwise migrating takes typing an explicit override.
-        print_section_header("STEP 4: LOADING INTO VERCEL POSTGRES")
+        print_section_header("STEP 3: LOAD - INTO VERCEL POSTGRES")
 
         if cannot_migrate:
             print(f"❌ Can't migrate {season_str}: {cannot_migrate}.")
@@ -210,9 +209,9 @@ def main():
         else:
             print(f"\n⏭️  Skipping migration for {season}-{(season+1)%100:02d}")
 
-    # Step 5: Update frontend with the new season
+    # Step 3 (cont.): update the web app with the new season
     if season_migrated:
-        print_section_header("STEP 5: UPDATING FRONTEND SEASONS LIST")
+        print_section_header("STEP 3: LOAD - UPDATING THE WEB APP'S SEASONS LIST")
 
         if update_seasons_list(season):
             print(f"📝 Added {season_str} to frontend seasons list")
@@ -224,8 +223,8 @@ def main():
         else:
             print(f"ℹ️  Season already exists in frontend, no update needed")
 
-    # Step 6: Final verification
-    print_section_header("STEP 6: FINAL DATABASE VERIFICATION")
+    # Step 3 (cont.): final check of what's in the database
+    print_section_header("STEP 3: LOAD - FINAL DATABASE CHECK")
 
     postgres_results = verify_postgres_migration()
     print_postgres_verification(postgres_results)

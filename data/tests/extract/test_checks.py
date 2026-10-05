@@ -1,12 +1,12 @@
 """
-Tests for the pure logic in validate.checks: the opponent comparison and
+Tests for the pure logic in extract.checks: the opponent comparison and
 the season-aware game-count check.
 
 These use synthetic data (no network, no fixtures) since both are pure
 functions.
 """
 
-from validate.checks import compare_opponent_multisets, check_game_counts
+from extract.checks import compare_opponent_multisets, check_game_counts
 from util.records import TeamGame
 
 
