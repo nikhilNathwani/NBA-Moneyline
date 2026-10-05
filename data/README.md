@@ -18,7 +18,7 @@ data/
   validate/           Step 2: check the scraped data against expectations and
                       the official schedule (verification.py)
   transform/          Step 3: turn the two rows per game into one record per
-                      real game, dated from the official schedule (matching.py)
+                      real game, dated from the official schedule (build_game_records.py)
   load/               Steps 4-6: load into Postgres, update the web app's season
                       list, final check; plus the Tableau CSV export
   util/               Shared pieces: the Game record, expected game counts per
@@ -127,7 +127,7 @@ comparison ignores order; Step 3 handles order.
 
 Every game is matched to its entry on basketball-reference's schedule, which turns
 the scraper's two rows into one record with the game's real date and home team
-(`transform/matching.py`):
+(`transform/build_game_records.py`):
 
 ```
 📅 Matched all 1224 games to their dates on basketball-reference
@@ -192,7 +192,7 @@ The dashboard (`tableau/NBA Moneyline.twbx`) reads `tableau/games.csv`, which th
 migration does **not** update:
 
 ```bash
-python3 data/load/export_tableau_csv.py   # from the project root: regenerates tableau/games.csv
+python3 data/load/tableau_csv.py   # from the project root: regenerates tableau/games.csv
 git add tableau/games.csv && git commit -m "Add <season> to Tableau data export"
 ```
 
@@ -262,7 +262,7 @@ won), `winodds`, `loseodds` (= the opponent's `winodds`), `opponent`, `game_date
 saved query over `games` and `teams`, so it can't drift from them.
 
 Whole-season rules (all 30 teams play, no team plays twice on one date) span many
-rows, so the migration checks them (`load/migrate_to_production.py`).
+rows, so the migration checks them (`load/postgres.py`).
 
 History (2026-10-04):
 -   The odds columns changed from text (`"+150"`) to integer, and the table got its

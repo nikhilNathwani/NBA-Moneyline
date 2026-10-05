@@ -1,7 +1,7 @@
 """
 Parses basketball-reference season-schedule HTML into a team's ordered list
 of true regular-season games (date, opponent, home/away, result), with
-in-season-tournament (IST) knockout games and play-in games excluded.
+play-in games excluded.
 
 Pure parsing/filtering logic, no network access, so it can be unit tested
 against saved HTML fixtures.
@@ -12,10 +12,6 @@ from typing import List
 
 from bs4 import BeautifulSoup
 
-IST_GROUP_STAGE_GAME_COUNT = 4  # every team plays exactly 4 IST group-stage games
-# basketball-reference's label for IST games: "In-Season Tournament" in its
-# first season (2023-24), "NBA Cup" since
-IST_NOTE_TEXTS = {"In-Season Tournament", "NBA Cup"}
 # Play-in games are listed in the regular-season table after a team's last
 # regular-season game - numbered 73-75 in the COVID seasons, 83-84 in 82-game
 # ones - so they're identified by this label, not by game number
@@ -68,25 +64,11 @@ def getTrueRegularSeasonOpponents(games: List[ScheduleGame]) -> List[str]:
 
 def getTrueRegularSeasonGames(games: List[ScheduleGame]) -> List[ScheduleGame]:
     """
-    Return a team's "true" regular-season games in order, excluding play-in
-    games and IST knockout-round games.
+    Return a team's true regular-season games in order: everything in the
+    regular-season table except play-in games.
 
-    IST knockout games are detected dynamically rather than by hardcoded
-    date: every team plays exactly IST_GROUP_STAGE_GAME_COUNT group-stage
-    games (tagged with an IST_NOTE_TEXTS label) early in the season; any
-    additional IST-tagged games beyond that count are knockout-round games
-    (quarterfinal/semifinal), which we deliberately don't scrape from
-    OddsPortal. This works for any season without needing this season's
-    specific knockout dates hardcoded.
+    This includes the in-season tournament's quarterfinals and semifinals,
+    which count toward the 82-game regular season. Its final doesn't count,
+    and basketball-reference doesn't list it here.
     """
-    ist_games_seen = 0
-    true_games = []
-    for game in games:
-        if game.note == PLAY_IN_NOTE_TEXT:
-            continue
-        if game.note in IST_NOTE_TEXTS:
-            ist_games_seen += 1
-            if ist_games_seen > IST_GROUP_STAGE_GAME_COUNT:
-                continue  # knockout-round game, excluded from our dataset
-        true_games.append(game)
-    return true_games
+    return [game for game in games if game.note != PLAY_IN_NOTE_TEXT]

@@ -1,11 +1,11 @@
 """
 Tests for extract.basketball_reference.parser using saved HTML fixtures
-(no network access) covering the cases that matter for our IST/play-in
-exclusion logic: an unaffected team, an IST quarterfinal-round loser, an IST
-semifinalist, and a team that also played in the play-in tournament - plus
-older seasons whose format differs: the 2019-20 COVID bubble, the 72-game
-2020-21 season (play-in games numbered below 82), and 2023-24 (IST labeled
-"In-Season Tournament" rather than "NBA Cup").
+(no network access) covering the cases that matter for which games count:
+an unaffected team, an IST quarterfinal-round loser, an IST semifinalist (both
+keep their knockout games, which count toward the 82), and a team that also
+played in the play-in tournament (excluded) - plus older seasons whose format
+differs: the 2019-20 COVID bubble and the 72-game 2020-21 season (play-in games
+numbered below 82), and 2023-24's IST champion.
 
 The unlabeled fixtures are from 2025-26.
 """
@@ -30,16 +30,17 @@ def test_unaffected_team_has_82_true_games():
     assert len(true_opponents) == 82
 
 
-def test_ist_quarterfinal_loser_excludes_one_knockout_game():
-    games, true_opponents = _load_true_opponents("TOR_ist_quarterfinal_loser_81.html")
-    assert len(games) == 82  # still 82 rows in the table...
-    assert len(true_opponents) == 81  # ...but 1 is an IST knockout game we exclude
-
-
-def test_ist_semifinalist_excludes_two_knockout_games():
-    games, true_opponents = _load_true_opponents("OKC_ist_semifinalist_80.html")
+def test_ist_quarterfinal_loser_keeps_its_knockout_game():
+    """IST quarterfinals count toward the regular season, so they're kept."""
+    games, true_opponents = _load_true_opponents("TOR_ist_quarterfinal_loser.html")
     assert len(games) == 82
-    assert len(true_opponents) == 80
+    assert len(true_opponents) == 82
+
+
+def test_ist_semifinalist_keeps_both_knockout_games():
+    games, true_opponents = _load_true_opponents("OKC_ist_semifinalist.html")
+    assert len(games) == 82
+    assert len(true_opponents) == 82
 
 
 def test_playin_games_are_excluded_regardless_of_ist_status():
@@ -69,9 +70,9 @@ def test_shortened_season_playin_games_are_excluded():
     assert len(true_opponents) == 72
 
 
-def test_in_season_tournament_label_is_recognized():
-    """2023-24 labels IST games "In-Season Tournament"; LAL won it (2 knockout
-    games excluded) and also played in the play-in (1 more excluded)."""
-    games, true_opponents = _load_true_opponents("LAL_2023-24_ist_semifinalist_playin_80.html")
+def test_ist_champion_with_playin_has_82():
+    """2023-24: LAL won the IST (the final isn't listed - it doesn't count) and
+    played in the play-in (excluded): 83 rows, 82 true games."""
+    games, true_opponents = _load_true_opponents("LAL_2023-24_ist_semifinalist_playin.html")
     assert len(games) == 83
-    assert len(true_opponents) == 80
+    assert len(true_opponents) == 82

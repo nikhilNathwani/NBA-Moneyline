@@ -71,18 +71,18 @@ def test_shortened_season_expects_72_each():
     assert not verify_scraped_data(_season_with_counts([72] * 30), 2021)['distribution_ok']
 
 
-def test_ist_season_expects_82_81_80_distribution():
-    counts = [82] * 22 + [81] * 4 + [80] * 4
-    results = verify_scraped_data(_season_with_counts(counts), 2023)
+def test_ist_seasons_expect_82_each():
+    """Since 2023-24 the IST knockout games are included, so every team plays 82."""
+    results = verify_scraped_data(_season_with_counts([82] * 30), 2023)
     assert results['total_games_ok'] and results['distribution_ok']
-    assert results['expected_total'] == 2448
+    assert results['expected_total'] == 2460
 
 
-def test_wrong_distribution_with_right_counts_is_caught():
-    counts = [82] * 21 + [81] * 5 + [80] * 4  # every count is a valid one, but 5 teams at 81
-    results = verify_scraped_data(_season_with_counts(counts), 2024)
+def test_team_short_a_game_is_caught():
+    results = verify_scraped_data(_season_with_counts([82] * 29 + [81]), 2024)
     assert not results['distribution_ok']
-    assert results['distribution_mismatch'] == {82: (22, 21), 81: (4, 5)}
+    assert results['distribution_mismatch'] == {82: (30, 29)}
+    assert results['unexpected_teams'] == [("Team 29", 81)]
 
 
 def test_bubble_season_count_check_is_not_applicable():

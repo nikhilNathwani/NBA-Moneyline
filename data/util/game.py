@@ -5,6 +5,7 @@ Represents a single NBA game from one team's perspective, including outcome and 
 """
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional
 
 
@@ -19,6 +20,7 @@ class Game:
     loseOdds: int  # Moneyline odds for this team losing (opponent's winOdds)
     seasonStartYear: int  # Calendar year in which the season started
     gameNumber: Optional[int] = None  # Number of game within the season (optional, set during post-processing)
+    listedDate: Optional[date] = None  # the date OddsPortal lists it under (its timezone; can be a day after the US date)
 
     def __str__(self):
         return (f"Season: {self.seasonStartYear}-{(self.seasonStartYear + 1) % 100:02d}, "

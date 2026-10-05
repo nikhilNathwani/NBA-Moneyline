@@ -10,7 +10,7 @@ to migrate to production, two ways:
   is order-agnostic (multiset of opponents, not sequence): OddsPortal's
   listing order doesn't always match the real date order (in 2025-26 it
   listed five games a few places late), so this checks only *which*
-  opponents (and how many times each) a team played. transform/matching.py
+  opponents (and how many times each) a team played. transform/build_game_records.py
   then places every game on its real date.
 
 Both work directly on the scraper's in-memory output - there's no

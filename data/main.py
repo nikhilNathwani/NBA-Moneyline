@@ -51,12 +51,12 @@ check_requirements()
 from extract.oddsportal.scraper import OddsPortalScraper
 from extract.basketball_reference.fetcher import load_true_schedules
 from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
-from transform.matching import match_to_schedule, MatchError
-from load.migrate_to_production import (
+from transform.build_game_records import match_to_schedule, MatchError
+from load.postgres import (
     verify_postgres_migration,
     migrate_season_to_postgres
 )
-from load.update_frontend import (
+from load.web_app import (
     update_seasons_list,
     commit_and_push_changes
 )
