@@ -14,7 +14,7 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from typing import Dict, List
 
-from transform.build_game_records import GameRecord
+from util.records import GameRecord
 from util.constants import PROJECT_ROOT
 
 

@@ -16,14 +16,15 @@ data/
                         real browser) and parser.py (reads them - pure, tested
                         against saved pages)
   validate/           Step 2: check the scraped data against expectations and
-                      the official schedule (verification.py)
+                      the official schedule (checks.py)
   transform/          Step 3: turn the two rows per game into one record per
                       real game, dated from the official schedule (build_game_records.py)
   load/               Steps 4-6: load into Postgres, update the web app's season
                       list, final check; plus the Tableau CSV export
-  util/               Shared pieces: the TeamGame record (team_game.py - one
-                      team's side of a game), constants (the project root,
-                      expected game counts per season), console output
+  util/               Shared pieces: the two game records (records.py - one
+                      team's side of a game, and one real game), constants
+                      (the project root, expected game counts per season),
+                      console output
   tests/              The pytest suite - checks the *code*, never runs during
                       the pipeline. Mirrors the folders above
   sample_queries.sql  Handy SQL for inspecting the database by hand

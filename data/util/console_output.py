@@ -4,7 +4,7 @@ Console output formatting utilities for the NBA Moneyline data pipeline.
 
 from typing import Dict, List
 
-from validate.verification import TeamScheduleComparison
+from validate.checks import TeamScheduleComparison
 
 
 def print_section_header(title: str):
@@ -14,8 +14,8 @@ def print_section_header(title: str):
     print(f"{'='*70}\n")
 
 
-def print_verification_results(season: int, results: Dict):
-    """Print scraped data verification results."""
+def print_game_count_results(season: int, results: Dict):
+    """Print the game-count check (Step 2)."""
     print_section_header(f"VERIFICATION RESULTS - {season}-{(season+1)%100:02d} Season")
 
     distribution = results['expected_distribution']

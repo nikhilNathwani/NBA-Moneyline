@@ -8,7 +8,7 @@ import datetime
 
 import pytest
 
-from util.team_game import TeamGame
+from util.records import TeamGame
 from transform.build_game_records import MatchError, match_to_schedule
 from extract.basketball_reference.parser import AWAY, HOME, NEUTRAL, ScheduleGame
 

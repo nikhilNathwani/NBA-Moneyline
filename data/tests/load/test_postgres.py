@@ -26,7 +26,7 @@ import pytest
 
 import load.postgres as migration
 from util.constants import PROJECT_ROOT
-from transform.build_game_records import GameRecord
+from util.records import GameRecord
 
 POSTGRES_APP_BIN = "/Applications/Postgres.app/Contents/Versions/latest/bin"
 

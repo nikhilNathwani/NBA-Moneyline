@@ -1,20 +1,20 @@
 """
-Verifies the quality of scraped moneyline data before it's trusted enough
-to migrate to production, two ways:
+The checks scraped data must pass before it's trusted enough to load into
+production:
 
-- verify_scraped_data: total and per-team game counts against a hardcoded,
+- check_game_counts: total and per-team game counts against a hardcoded,
   independently-derived expectation for that season (see util/constants.py)
   - fast, no network access.
-- validate_scraped_data_against_schedule: per-team, per-opponent game
+- check_opponents: per-team, per-opponent game
   counts against basketball-reference's authoritative schedule. Comparison
   is order-agnostic (multiset of opponents, not sequence): OddsPortal's
   listing order doesn't always match the real date order (in 2025-26 it
   listed five games a few places late), so this checks only *which*
-  opponents (and how many times each) a team played. transform/build_game_records.py
-  then places every game on its real date.
+  opponents (and how many times each) a team played.
+  transform/build_game_records.py then places every game on its real date.
 
 Both work directly on the scraper's in-memory output - there's no
-intermediate storage to verify against.
+intermediate storage to check against.
 """
 
 from collections import Counter
@@ -23,10 +23,10 @@ from typing import Dict, List
 
 from extract.basketball_reference.parser import ScheduleGame
 from util.constants import expected_game_count_distribution, expected_total_rows
-from util.team_game import TeamGame
+from util.records import TeamGame
 
 
-def verify_scraped_data(team_games: Dict[str, List[TeamGame]], season: int) -> Dict:
+def check_game_counts(team_games: Dict[str, List[TeamGame]], season: int) -> Dict:
     """
     Verify scraped data straight from the scraper's output against the
     season's expected per-team game counts (see util/constants.py).
@@ -109,7 +109,7 @@ def compare_opponent_multisets(true_opponents: List[str], scraped_opponents: Lis
     }
 
 
-def validate_scraped_data_against_schedule(team_games: Dict[str, List[TeamGame]],
+def check_opponents(team_games: Dict[str, List[TeamGame]],
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's

@@ -1,13 +1,13 @@
 """
-Tests for the pure logic in validate.verification: the opponent comparison and
+Tests for the pure logic in validate.checks: the opponent comparison and
 the season-aware game-count check.
 
 These use synthetic data (no network, no fixtures) since both are pure
 functions.
 """
 
-from validate.verification import compare_opponent_multisets, verify_scraped_data
-from util.team_game import TeamGame
+from validate.checks import compare_opponent_multisets, check_game_counts
+from util.records import TeamGame
 
 
 def test_identical_sequences_match():
@@ -60,26 +60,26 @@ def _season_with_counts(counts):
 
 
 def test_normal_season_expects_82_each():
-    results = verify_scraped_data(_season_with_counts([82] * 30), 2016)
+    results = check_game_counts(_season_with_counts([82] * 30), 2016)
     assert results['total_games_ok'] and results['distribution_ok']
     assert results['expected_total'] == 2460
 
 
 def test_shortened_season_expects_72_each():
-    assert verify_scraped_data(_season_with_counts([72] * 30), 2020)['distribution_ok']
+    assert check_game_counts(_season_with_counts([72] * 30), 2020)['distribution_ok']
     # The same data would be badly short in a normal season
-    assert not verify_scraped_data(_season_with_counts([72] * 30), 2021)['distribution_ok']
+    assert not check_game_counts(_season_with_counts([72] * 30), 2021)['distribution_ok']
 
 
 def test_ist_seasons_expect_82_each():
     """Since 2023-24 the IST knockout games are included, so every team plays 82."""
-    results = verify_scraped_data(_season_with_counts([82] * 30), 2023)
+    results = check_game_counts(_season_with_counts([82] * 30), 2023)
     assert results['total_games_ok'] and results['distribution_ok']
     assert results['expected_total'] == 2460
 
 
 def test_team_short_a_game_is_caught():
-    results = verify_scraped_data(_season_with_counts([82] * 29 + [81]), 2024)
+    results = check_game_counts(_season_with_counts([82] * 29 + [81]), 2024)
     assert not results['distribution_ok']
     assert results['distribution_mismatch'] == {82: (30, 29)}
     assert results['unexpected_teams'] == [("Team 29", 81)]
@@ -87,7 +87,7 @@ def test_team_short_a_game_is_caught():
 
 def test_bubble_season_count_check_is_not_applicable():
     """2019-20 has no fixed pattern: None means "doesn't apply", not "passed"."""
-    results = verify_scraped_data(_season_with_counts([64, 75] + [72] * 28), 2019)
+    results = check_game_counts(_season_with_counts([64, 75] + [72] * 28), 2019)
     assert results['expected_distribution'] is None
     assert results['distribution_ok'] is None
     assert results['total_games_ok'] is None

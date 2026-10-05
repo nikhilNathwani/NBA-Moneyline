@@ -50,7 +50,7 @@ check_requirements()
 
 from extract.oddsportal import scraper as oddsportal
 from extract.basketball_reference import scraper as basketball_reference
-from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
+from validate.checks import check_game_counts, check_opponents
 from transform.build_game_records import match_to_schedule, MatchError
 from load.postgres import (
     verify_postgres_migration,
@@ -62,7 +62,7 @@ from load.web_app import (
 )
 from util.console_output import (
     print_section_header,
-    print_verification_results,
+    print_game_count_results,
     print_schedule_validation_results,
     print_postgres_verification
 )
@@ -132,13 +132,13 @@ def main():
         # Step 2: Validate the scraped data
         print_section_header("STEP 2: VALIDATING SCRAPED DATA")
 
-        verification_results = verify_scraped_data(season_games, season)
-        print_verification_results(season, verification_results)
+        count_results = check_game_counts(season_games, season)
+        print_game_count_results(season, count_results)
 
         # Every reason this season shouldn't migrate without a deliberate
         # override (the data might still be right and the expectation wrong)
         failed_checks = []
-        if verification_results['distribution_ok'] is False or verification_results['total_games_ok'] is False:
+        if count_results['distribution_ok'] is False or count_results['total_games_ok'] is False:
             failed_checks.append("game counts don't match the expected distribution (Step 2)")
         # Set if migrating is impossible, not just unadvised: the games
         # table needs each game's date, which only Step 3 provides
@@ -149,7 +149,7 @@ def main():
             cannot_migrate = (f"basketball-reference's schedule couldn't be downloaded in Step 1 "
                               f"({schedules_error}), and it's needed to date each game")
         else:
-            schedule_comparisons = validate_scraped_data_against_schedule(season_games, schedules)
+            schedule_comparisons = check_opponents(season_games, schedules)
             print_schedule_validation_results(season, schedule_comparisons)
             mismatched = [c for c in schedule_comparisons if not c.ok]
             if mismatched:

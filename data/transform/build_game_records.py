@@ -32,23 +32,11 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Dict, List
 
-from util.team_game import TeamGame
+from util.records import TeamGame, GameRecord
 from extract.basketball_reference.parser import AWAY, NEUTRAL, ScheduleGame
 
 MAX_POSITION_GAP = 8
 MAX_DATE_GAP = timedelta(days=1)
-
-
-@dataclass
-class GameRecord:
-    """One real game, ready for the production games table."""
-    game_date: date
-    home: str
-    away: str
-    neutral_site: bool  # played abroad etc.; home/away is then alphabetical, for structure only
-    home_won: bool
-    home_odds: int
-    away_odds: int
 
 
 @dataclass

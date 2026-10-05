@@ -30,7 +30,7 @@ from typing import Dict, List, Optional
 
 from bs4 import BeautifulSoup
 
-from util.team_game import TeamGame
+from util.records import TeamGame
 
 BASE = "https://www.oddsportal.com/basketball/usa"
 DATE_HEADER = re.compile(r"^(\d{1,2} [A-Z][a-z]{2} \d{4})\s*(?:-\s*(.+))?$")

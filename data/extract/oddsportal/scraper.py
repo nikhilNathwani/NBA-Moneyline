@@ -26,7 +26,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
 from util.constants import FIRST_IST_SEASON
-from util.team_game import TeamGame
+from util.records import TeamGame
 from extract.oddsportal.parser import (
     make_season_specific_url, make_current_season_url, url_matches_requested_season, make_cup_url_candidates,
     get_last_page_num, parse_results_page, is_regular_season, rows_fall_in_season, build_team_games, ResultRow,
