@@ -57,7 +57,7 @@ uv pip list
 ```bash
 cd data
 source .venv/bin/activate
-python3 -c "from extract.odds.scraper import OddsPortalScraper; print('✅ Imports work')"
+python3 -c "from extract.oddsportal.scraper import OddsPortalScraper; print('✅ Imports work')"
 ```
 
 **Expected:** "✅ Imports work" prints

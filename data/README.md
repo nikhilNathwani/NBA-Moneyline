@@ -10,10 +10,10 @@ the Tableau dashboard read. It runs once a year, after a regular season ends.
 data/
   main.py             The whole pipeline, steps 1-6 in order - start here
   extract/            Step 1: get the season from both sources
-    odds/               OddsPortal: odds and results, two rows per game
+    oddsportal/         OddsPortal: odds and results, two rows per game
                         (scraper.py drives the browser; parser.py is the pure
                         HTML parsing)
-    schedules/          basketball-reference: the official schedule - dates,
+    basketball_reference/  the official schedule - dates,
                         home/away (fetcher.py downloads, parser.py parses)
   validate/           Step 2: check the scraped data against expectations and
                       the official schedule (verification.py)

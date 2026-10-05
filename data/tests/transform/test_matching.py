@@ -10,7 +10,7 @@ import pytest
 
 from util.game import Game
 from transform.matching import MatchError, match_to_schedule
-from extract.schedules.parser import AWAY, HOME, NEUTRAL, ScheduleGame
+from extract.basketball_reference.parser import AWAY, HOME, NEUTRAL, ScheduleGame
 
 # (date, home, away, home_won, home_odds, away_odds, neutral)
 SEASON = [

@@ -21,7 +21,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List
 
-from extract.schedules.parser import ScheduleGame
+from extract.basketball_reference.parser import ScheduleGame
 from util.constants import expected_game_count_distribution, expected_total_rows
 from util.game import Game
 
@@ -113,7 +113,7 @@ def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]],
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (from extract.schedules.fetcher.load_true_schedules).
+    authoritative schedule (from extract.basketball_reference.fetcher.load_true_schedules).
     """
     results = []
     for team_full_name, true_games in schedules.items():

@@ -36,7 +36,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from util.game import Game
-from extract.odds.parser import (
+from extract.oddsportal.parser import (
     makeSeasonSpecificUrl, makeCurrentSeasonUrl, urlMatchesRequestedSeason,
     getLastPageNum, parseGameRows, getDateHeaderRow, isRegularSeason,
     countGameDataRows, extractGameRowAndTeamNames, RowOddsResult,
@@ -318,7 +318,7 @@ class OddsPortalScraper:
     def scrapeGamesFromPage(self, url: str, page_num: int, seasonStartYear: int, games: Dict[str, List[Game]],
                              max_attempts: int = 5, cache_dir: Optional[str] = None,
                              is_last_page: bool = False) -> bool:
-        # Cache is keyed by page number, mirroring extract/schedules/fetcher.py's
+        # Cache is keyed by page number, mirroring extract/basketball_reference/fetcher.py's
         # per-team cache: lets a re-run (e.g. after OddsPortal rate-limits
         # mid-scrape) skip straight past every page that already rendered
         # successfully, instead of re-scraping the whole season from page 1.

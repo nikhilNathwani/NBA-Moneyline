@@ -1,5 +1,5 @@
 """
-Tests for extract.schedules.parser using saved HTML fixtures
+Tests for extract.basketball_reference.parser using saved HTML fixtures
 (no network access) covering the cases that matter for our IST/play-in
 exclusion logic: an unaffected team, an IST quarterfinal-round loser, an IST
 semifinalist, and a team that also played in the play-in tournament - plus
@@ -12,7 +12,7 @@ The unlabeled fixtures are from 2025-26.
 
 import os
 
-from extract.schedules.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from extract.basketball_reference.parser import parseScheduleTable, getTrueRegularSeasonOpponents
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 

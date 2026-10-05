@@ -48,8 +48,8 @@ def check_requirements():
 
 check_requirements()
 
-from extract.odds.scraper import OddsPortalScraper
-from extract.schedules.fetcher import load_true_schedules
+from extract.oddsportal.scraper import OddsPortalScraper
+from extract.basketball_reference.fetcher import load_true_schedules
 from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
 from transform.matching import match_to_schedule, MatchError
 from load.migrate_to_production import (

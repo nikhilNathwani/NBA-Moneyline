@@ -18,8 +18,8 @@ import urllib.request
 
 from typing import Dict, List, Optional
 
-from extract.schedules.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
-from extract.schedules.team_codes import TEAM_ABBR_TO_FULL_NAME
+from extract.basketball_reference.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
+from extract.basketball_reference.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
 REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits
