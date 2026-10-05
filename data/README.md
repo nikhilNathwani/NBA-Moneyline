@@ -201,12 +201,16 @@ git add tableau/games.csv && git commit -m "Add <season> to Tableau data export"
 
 Then in Tableau:
 
-1. Open `tableau/NBA Moneyline.twbx` (the live connection reads the new CSV).
+1. Open `tableau/NBA Moneyline.twbx`, then **refresh the extract**: Data menu ->
+   the `games` data source -> Extract -> Refresh. The dashboard reads a snapshot
+   of the CSV saved inside the workbook, not the CSV itself, so without this step
+   re-publishing uploads the old data. (New CSV columns also only appear after it.)
 2. Add the new season to the **Season Start Year Parameter** list (Data pane ->
    right-click -> Edit). Once dynamic parameters point at the field this should
    update on open, but confirm.
 3. Check a worked example still holds (e.g. Boston Celtics 2023-24, win every
-   game, $100 -> +$122.39, +1.51% ROI, 64-17).
+   game, $100 -> +$22.39, +0.27% ROI, 64-18 - their official record, including
+   the NBA Cup quarterfinal they lost).
 4. **File -> Save to Tableau Public**, same workbook name, replacing the existing
    viz - the URL (`public.tableau.com/views/NBAMoneyline/NBAMoneyline`) is kept.
 5. Commit the updated `.twbx`.
