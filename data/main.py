@@ -129,7 +129,7 @@ def main():
             print(f"❌ Couldn't download basketball-reference's schedule ({schedules_error})")
 
         # Step 1 (cont.): check the scraped data before anything is transformed
-        print_section_header("STEP 1: EXTRACT - CHECKING THE SCRAPED DATA")
+        print_section_header("CHECKING THE SCRAPED DATA")
 
         count_results = check_game_counts(season_games, season)
         print_game_count_results(season, count_results)
@@ -211,7 +211,7 @@ def main():
 
     # Step 3 (cont.): update the web app with the new season
     if season_migrated:
-        print_section_header("STEP 3: LOAD - UPDATING THE WEB APP'S SEASONS LIST")
+        print_section_header("UPDATING THE WEB APP'S SEASONS LIST")
 
         if update_seasons_list(season):
             print(f"📝 Added {season_str} to frontend seasons list")
@@ -224,7 +224,7 @@ def main():
             print(f"ℹ️  Season already exists in frontend, no update needed")
 
     # Step 3 (cont.): final check of what's in the database
-    print_section_header("STEP 3: LOAD - FINAL DATABASE CHECK")
+    print_section_header("FINAL DATABASE CHECK")
 
     postgres_results = verify_postgres_migration()
     print_postgres_verification(postgres_results)
