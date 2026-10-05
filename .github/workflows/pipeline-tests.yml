@@ -21,7 +21,7 @@ jobs:
                 working-directory: data
         steps:
             - uses: actions/checkout@v7
-            - uses: astral-sh/setup-uv@v10
+            - uses: astral-sh/setup-uv@v10.2.0  # this action only tags full versions
             - name: Create the venv (Python version from data/.python-version)
               run: |
                   uv venv --managed-python .venv
