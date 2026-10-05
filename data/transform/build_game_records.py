@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Dict, List
 
-from util.game import Game
+from util.team_game import TeamGame
 from extract.basketball_reference.parser import AWAY, NEUTRAL, ScheduleGame
 
 MAX_POSITION_GAP = 8
@@ -90,30 +90,30 @@ def _real_games(schedules: Dict[str, List[ScheduleGame]]) -> List[dict]:
     return games
 
 
-def _candidate_pairs(game: dict, rows: Dict[str, List[Game]]) -> set:
+def _candidate_pairs(game: dict, rows: Dict[str, List[TeamGame]]) -> set:
     """Pairs of (home row index, away row index) that could represent this game."""
     home, away = game["home"], game["away"]
 
     def near(team, opponent, won):
         return [i for i, r in enumerate(rows.get(team, []))
                 if r.opponent == opponent and r.outcome == won
-                and abs(r.gameNumber - game["pos"][team]) <= MAX_POSITION_GAP
-                and (r.listedDate is None or abs(r.listedDate - game["date_value"]) <= MAX_DATE_GAP)]
+                and abs(r.game_number - game["pos"][team]) <= MAX_POSITION_GAP
+                and (r.listed_date is None or abs(r.listed_date - game["date_value"]) <= MAX_DATE_GAP)]
 
     home_rows = near(home, away, game["home_won"])
     away_rows = near(away, home, not game["home_won"])
     return {(h, a) for h in home_rows for a in away_rows
-            if rows[home][h].winOdds == rows[away][a].loseOdds
-            and rows[home][h].loseOdds == rows[away][a].winOdds}
+            if rows[home][h].win_odds == rows[away][a].lose_odds
+            and rows[home][h].lose_odds == rows[away][a].win_odds}
 
 
-def match_to_schedule(team_games: Dict[str, List[Game]],
+def match_to_schedule(team_games: Dict[str, List[TeamGame]],
                       schedules: Dict[str, List[ScheduleGame]]) -> MatchResult:
     """
     Args:
         team_games: scraped games straight from the scraper's output
-            ({team: games}, gameNumber = position in OddsPortal's order)
-        schedules: basketball-reference's true schedules (load_true_schedules)
+            ({team: games}, game_number = position in OddsPortal's order)
+        schedules: basketball-reference's true schedules (fetch_season_schedules)
 
     Returns one GameRecord per real game, plus how many games needed pass 2
     (listed out of date order on OddsPortal). Raises MatchError
@@ -136,7 +136,7 @@ def match_to_schedule(team_games: Dict[str, List[Game]],
     for i, g in enumerate(games):
         for pair in candidates[i]:
             h_row, a_row = team_games[g["home"]][pair[0]], team_games[g["away"]][pair[1]]
-            if h_row.gameNumber == g["pos"][g["home"]] and a_row.gameNumber == g["pos"][g["away"]] and free(i, pair):
+            if h_row.game_number == g["pos"][g["home"]] and a_row.game_number == g["pos"][g["away"]] and free(i, pair):
                 assign(i, pair)
                 break
 
@@ -146,7 +146,7 @@ def match_to_schedule(team_games: Dict[str, List[Game]],
         """Total days between the pair's OddsPortal dates and the real date."""
         g = games[i]
         rows_ = (team_games[g["home"]][pair[0]], team_games[g["away"]][pair[1]])
-        return sum(abs((r.listedDate - g["date_value"]).days) for r in rows_ if r.listedDate)
+        return sum(abs((r.listed_date - g["date_value"]).days) for r in rows_ if r.listed_date)
 
     # Pass 2: elimination - any game with exactly one possible pair left gets
     # it. Pass 3 (only when that stalls): a game whose candidates include
@@ -190,7 +190,7 @@ def match_to_schedule(team_games: Dict[str, List[Game]],
         records.append(GameRecord(
             game_date=datetime.strptime(g["date"], "%a, %b %d, %Y").date(),
             home=g["home"], away=g["away"], neutral_site=g["neutral"], home_won=g["home_won"],
-            home_odds=team_games[g["home"]][h].winOdds, away_odds=team_games[g["away"]][a].winOdds,
+            home_odds=team_games[g["home"]][h].win_odds, away_odds=team_games[g["away"]][a].win_odds,
         ))
     return MatchResult(records=sorted(records, key=lambda r: (r.game_date, r.home)),
                        listed_out_of_order=len(games) - in_place)

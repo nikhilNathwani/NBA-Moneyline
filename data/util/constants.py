@@ -1,7 +1,9 @@
 """
-Expected per-team game counts for each NBA regular season, looked up by
-season because the league's format has changed over the seasons this
-project covers:
+Constants shared across the pipeline: the project's location on disk, and
+expected per-team game counts for each NBA regular season.
+
+The counts are looked up by season because the league's format has changed
+over the seasons this project covers:
 
 - Normal seasons: all 30 teams play 82 games. Since 2023-24 that includes
   the in-season tournament (NBA Cup): its group games, quarterfinals and
@@ -17,7 +19,11 @@ Counts are per team, so a season's expected total is in team-game rows
 (2 per game), the same unit the scraper uses.
 """
 
+import os
 from typing import Dict, Optional
+
+# The project root (parent of data/): data/util/constants.py -> data/util -> data -> root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 TEAMS_PER_LEAGUE = 30
 BASELINE_GAMES_PER_TEAM = 82

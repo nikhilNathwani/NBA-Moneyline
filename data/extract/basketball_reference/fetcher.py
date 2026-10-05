@@ -2,7 +2,7 @@
 Fetches season-schedule pages from basketball-reference.com - the pipeline's
 second data source, alongside OddsPortal. Its official schedule is what
 validate/ checks opponents against and what transform/ dates every game
-from. load_true_schedules is the entry point: fetch every team's page, then
+from. fetch_season_schedules is the entry point: fetch every team's page, then
 parse it (parser.py).
 
 Kept separate from parser.py so the parsing logic can be unit
@@ -18,7 +18,7 @@ import urllib.request
 
 from typing import Dict, List, Optional
 
-from extract.basketball_reference.parser import ScheduleGame, parseScheduleTable, getTrueRegularSeasonGames
+from extract.basketball_reference.parser import ScheduleGame, parse_schedule_table, get_true_regular_season_games
 from extract.basketball_reference.team_codes import TEAM_ABBR_TO_FULL_NAME
 
 USER_AGENT = "Mozilla/5.0 (compatible; nba-moneyline-schedule-check/1.0)"
@@ -26,20 +26,20 @@ REQUEST_DELAY_SECONDS = 4  # be polite to basketball-reference's rate limits
 MAX_FETCH_ATTEMPTS = 3
 
 
-def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None) -> tuple:
+def fetch_team_schedule_html(abbr: str, season_start_year: int, cache_dir: str = None) -> tuple:
     """
     Fetch (or read from cache) the season-schedule page HTML for one team.
 
     Args:
         abbr: basketball-reference 3-letter team code (see team_codes.py)
-        seasonStartYear: calendar year the season started (e.g. 2025 for 2025-26)
+        season_start_year: calendar year the season started (e.g. 2025 for 2025-26)
         cache_dir: if given, read/write a cached copy at {cache_dir}/{abbr}_{year}.html
                    instead of always hitting the network
 
     Returns:
         tuple: (html: str, was_cached: bool)
     """
-    season_end_year = seasonStartYear + 1
+    season_end_year = season_start_year + 1
     cache_path = None
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
@@ -72,7 +72,7 @@ def fetchTeamScheduleHtml(abbr: str, seasonStartYear: int, cache_dir: str = None
     return html, False
 
 
-def fetchAllTeamSchedules(seasonStartYear: int, cache_dir: str = None) -> dict:
+def fetch_all_team_schedules(season_start_year: int, cache_dir: str = None) -> dict:
     """
     Fetch every team's season-schedule HTML for a season.
 
@@ -82,23 +82,23 @@ def fetchAllTeamSchedules(seasonStartYear: int, cache_dir: str = None) -> dict:
     """
     html_by_team = {}
     for abbr, full_name in TEAM_ABBR_TO_FULL_NAME.items():
-        html, was_cached = fetchTeamScheduleHtml(abbr, seasonStartYear, cache_dir=cache_dir)
+        html, was_cached = fetch_team_schedule_html(abbr, season_start_year, cache_dir=cache_dir)
         html_by_team[full_name] = html
         if not was_cached:
             time.sleep(REQUEST_DELAY_SECONDS)
     return html_by_team
 
 
-def load_true_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
+def fetch_season_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
     """
     Every team's true regular-season games from basketball-reference (IST
     knockout and play-in games excluded), as {team_full_name: games in order}.
 
     Args:
-        season: seasonStartYear (e.g. 2025 for the 2025-26 season)
+        season: season_start_year (e.g. 2025 for the 2025-26 season)
         cache_dir: optional directory to cache fetched schedule HTML in,
                    so a re-run doesn't re-fetch from basketball-reference
     """
-    html_by_team = fetchAllTeamSchedules(season, cache_dir=cache_dir)
-    return {team: getTrueRegularSeasonGames(parseScheduleTable(html))
+    html_by_team = fetch_all_team_schedules(season, cache_dir=cache_dir)
+    return {team: get_true_regular_season_games(parse_schedule_table(html))
             for team, html in html_by_team.items()}

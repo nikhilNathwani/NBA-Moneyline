@@ -9,7 +9,7 @@ import re
 import subprocess
 from typing import List
 
-from util.paths import PROJECT_ROOT
+from util.constants import PROJECT_ROOT
 
 SEASONS_ARRAY_PATTERN = r'const seasons = \[([\s\S]*?)\];'
 

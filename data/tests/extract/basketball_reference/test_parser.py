@@ -12,7 +12,7 @@ The unlabeled fixtures are from 2025-26.
 
 import os
 
-from extract.basketball_reference.parser import parseScheduleTable, getTrueRegularSeasonOpponents
+from extract.basketball_reference.parser import parse_schedule_table, get_true_regular_season_opponents
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
@@ -20,8 +20,8 @@ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 def _load_true_opponents(fixture_filename):
     with open(os.path.join(FIXTURES_DIR, fixture_filename), encoding="utf-8") as f:
         html = f.read()
-    games = parseScheduleTable(html)
-    return games, getTrueRegularSeasonOpponents(games)
+    games = parse_schedule_table(html)
+    return games, get_true_regular_season_opponents(games)
 
 
 def test_unaffected_team_has_82_true_games():

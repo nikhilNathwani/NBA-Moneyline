@@ -8,7 +8,7 @@ import datetime
 
 import pytest
 
-from util.game import Game
+from util.team_game import TeamGame
 from transform.build_game_records import MatchError, match_to_schedule
 from extract.basketball_reference.parser import AWAY, HOME, NEUTRAL, ScheduleGame
 
@@ -39,13 +39,13 @@ def _scraped(games, order=None):
     team's row order ({team: [indexes into that team's games, in listed order]})."""
     rows = {}
     for date, home, away, home_won, home_odds, away_odds, _ in games:
-        rows.setdefault(home, []).append(Game(home, away, home_won, home_odds, away_odds, 2025))
-        rows.setdefault(away, []).append(Game(away, home, not home_won, away_odds, home_odds, 2025))
+        rows.setdefault(home, []).append(TeamGame(home, away, home_won, home_odds, away_odds, 2025))
+        rows.setdefault(away, []).append(TeamGame(away, home, not home_won, away_odds, home_odds, 2025))
     for team, indexes in (order or {}).items():
         rows[team] = [rows[team][i] for i in indexes]
     for team_rows in rows.values():
         for n, game in enumerate(team_rows, 1):
-            game.gameNumber = n
+            game.game_number = n
     return rows
 
 
@@ -97,15 +97,15 @@ def test_missing_scraped_game_raises():
 
 def test_extra_scraped_row_raises():
     scraped = _scraped(SEASON)
-    scraped["A"].append(Game("A", "B", True, -150, 130, 2025, 4))
-    scraped["B"].append(Game("B", "A", False, 130, -150, 2025, 4))
+    scraped["A"].append(TeamGame("A", "B", True, -150, 130, 2025, 4))
+    scraped["B"].append(TeamGame("B", "A", False, 130, -150, 2025, 4))
     with pytest.raises(MatchError, match="don't belong to any game"):
         match_to_schedule(scraped, _schedules(SEASON))
 
 
 def test_mismatched_odds_raise_instead_of_guessing():
     scraped = _scraped(SEASON)
-    scraped["B"][0].loseOdds = -999  # B's row no longer mirrors A's
+    scraped["B"][0].lose_odds = -999  # B's row no longer mirrors A's
     with pytest.raises(MatchError):
         match_to_schedule(scraped, _schedules(SEASON))
 
@@ -118,13 +118,13 @@ def test_team_missing_a_game_still_matches_its_other_games_by_date():
               ("Thu, Nov 6, 2025", "A", "B", False, 120, -140, False)]
     scraped = _scraped(season)
     for team in ("A", "B"):
-        scraped[team] = [g for g in scraped[team] if not (g.opponent in ("A", "B") and g.winOdds in (-150, 130))]
+        scraped[team] = [g for g in scraped[team] if not (g.opponent in ("A", "B") and g.win_odds in (-150, 130))]
         for n, g in enumerate(scraped[team], 1):
-            g.gameNumber = n
+            g.game_number = n
     for team, team_rows in scraped.items():
         for g in team_rows:
-            g.listedDate = {("A", "C"): 5, ("C", "A"): 5}.get((team, g.opponent), 6)
-            g.listedDate = __import__("datetime").date(2025, 11, g.listedDate)
+            g.listed_date = {("A", "C"): 5, ("C", "A"): 5}.get((team, g.opponent), 6)
+            g.listed_date = __import__("datetime").date(2025, 11, g.listed_date)
     with pytest.raises(MatchError, match="1 game"):  # only the truly missing game fails
         match_to_schedule(scraped, _schedules(season))
 
@@ -136,9 +136,9 @@ def test_same_teams_on_consecutive_days_are_told_apart_by_date():
     scraped = _scraped(season)
     for team_rows in scraped.values():
         for g, day in zip(team_rows, (19, 20)):
-            g.listedDate = datetime.date(2026, 2, day)
+            g.listed_date = datetime.date(2026, 2, day)
     # Shift positions so pass 1 (exact position) can't settle it
     for g in scraped["I"]:
-        g.gameNumber += 1
+        g.game_number += 1
     result = match_to_schedule(scraped, _schedules(season))
     assert [(r.game_date.day, r.home_odds) for r in result.records] == [(19, -150), (20, -160)]

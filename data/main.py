@@ -48,8 +48,8 @@ def check_requirements():
 
 check_requirements()
 
-from extract.oddsportal.scraper import OddsPortalScraper
-from extract.basketball_reference.fetcher import load_true_schedules
+from extract.oddsportal.scraper import scrape_season
+from extract.basketball_reference.fetcher import fetch_season_schedules
 from validate.verification import verify_scraped_data, validate_scraped_data_against_schedule
 from transform.build_game_records import match_to_schedule, MatchError
 from load.postgres import (
@@ -114,9 +114,8 @@ def main():
     print_section_header(f"STEP 1: EXTRACTING {season_str} SEASON")
 
     print("📥 OddsPortal (odds and results)\n")
-    scraper = OddsPortalScraper(headless=args.headless)
     try:
-        season_games = scraper.scrapeSeasonSchedule(season, cache_dir=odds_cache_dir)
+        season_games = scrape_season(season, cache_dir=odds_cache_dir, headless=args.headless)
     except RuntimeError as e:
         print(f"\n❌ Scraping {season_str} aborted: {e}")
         print(f"⏭️  Pages that rendered successfully before the abort are cached for the next run.")
@@ -124,7 +123,7 @@ def main():
     if season_games is not None:
         print("📥 basketball-reference (official schedule)")
         try:
-            schedules = load_true_schedules(season, cache_dir=bbref_cache_dir)
+            schedules = fetch_season_schedules(season, cache_dir=bbref_cache_dir)
             print(f"✅ Downloaded all {len(schedules)} teams' schedules")
         except Exception as e:
             schedules_error = f"{e.__class__.__name__}: {e}"

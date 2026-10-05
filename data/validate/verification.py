@@ -23,10 +23,10 @@ from typing import Dict, List
 
 from extract.basketball_reference.parser import ScheduleGame
 from util.constants import expected_game_count_distribution, expected_total_rows
-from util.game import Game
+from util.team_game import TeamGame
 
 
-def verify_scraped_data(team_games: Dict[str, List[Game]], season: int) -> Dict:
+def verify_scraped_data(team_games: Dict[str, List[TeamGame]], season: int) -> Dict:
     """
     Verify scraped data straight from the scraper's output against the
     season's expected per-team game counts (see util/constants.py).
@@ -109,11 +109,11 @@ def compare_opponent_multisets(true_opponents: List[str], scraped_opponents: Lis
     }
 
 
-def validate_scraped_data_against_schedule(team_games: Dict[str, List[Game]],
+def validate_scraped_data_against_schedule(team_games: Dict[str, List[TeamGame]],
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (from extract.basketball_reference.fetcher.load_true_schedules).
+    authoritative schedule (from extract.basketball_reference.fetcher.fetch_season_schedules).
     """
     results = []
     for team_full_name, true_games in schedules.items():

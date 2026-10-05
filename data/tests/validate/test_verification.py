@@ -7,7 +7,7 @@ functions.
 """
 
 from validate.verification import compare_opponent_multisets, verify_scraped_data
-from util.game import Game
+from util.team_game import TeamGame
 
 
 def test_identical_sequences_match():
@@ -55,7 +55,7 @@ def test_legitimate_rematch_with_repeated_opponent_is_not_flagged():
 
 def _season_with_counts(counts):
     """Scraped-data stand-in: {team: [games]} with the given per-team counts."""
-    return {f"Team {i:02d}": [Game(f"Team {i:02d}", "X", True, -110, -110, 2000)] * n
+    return {f"Team {i:02d}": [TeamGame(f"Team {i:02d}", "X", True, -110, -110, 2000)] * n
             for i, n in enumerate(counts)}
 
 

@@ -30,7 +30,7 @@ from typing import Dict, List, Optional
 
 from bs4 import BeautifulSoup
 
-from util.game import Game
+from util.team_game import TeamGame
 
 BASE = "https://www.oddsportal.com/basketball/usa"
 DATE_HEADER = re.compile(r"^(\d{1,2} [A-Z][a-z]{2} \d{4})\s*(?:-\s*(.+))?$")
@@ -45,22 +45,22 @@ SCORE = re.compile(r"^\d+$")
 # OddsPortal only gives a season its own archived results URL once a newer
 # season has started; the most recently completed season is only reachable
 # via the generic (season-agnostic) "current results" URL until then. Both
-# are needed - see _resolveSeasonUrl in scraper.py, which checks which one
+# are needed - see _resolve_season_url in scraper.py, which checks which one
 # applies rather than hardcoding an assumption that breaks as soon as a new
 # season starts. Pages beyond the first are reached in-app (see scraper.py),
 # not by URL.
 
-def makeSeasonSpecificUrl(seasonStartYear: int) -> str:
-    return f"{BASE}/nba-{seasonStartYear}-{seasonStartYear + 1}/results/"
+def make_season_specific_url(season_start_year: int) -> str:
+    return f"{BASE}/nba-{season_start_year}-{season_start_year + 1}/results/"
 
 
-def makeCurrentSeasonUrl() -> str:
+def make_current_season_url() -> str:
     return f"{BASE}/nba/results/"
 
 
-def urlMatchesRequestedSeason(url: str, seasonStartYear: int) -> bool:
+def url_matches_requested_season(url: str, season_start_year: int) -> bool:
     """Whether a (possibly redirected-to) URL is still the requested season's archive."""
-    return f"nba-{seasonStartYear}-{seasonStartYear + 1}" in url
+    return f"nba-{season_start_year}-{season_start_year + 1}" in url
 
 
 # The in-season tournament's knockout rounds (quarterfinals, semifinals and
@@ -70,9 +70,9 @@ def urlMatchesRequestedSeason(url: str, seasonStartYear: int) -> bool:
 # quarterfinals and semifinals count toward the regular season; the final
 # doesn't (it's listed under a "- Play Offs" header, so the regular-season
 # filter drops it).
-def makeCupUrlCandidates(seasonStartYear: int) -> List[str]:
-    return [f"{BASE}/nba-cup-{seasonStartYear}/results/",
-            f"{BASE}/nba-in-season-tournament-{seasonStartYear}/results/",
+def make_cup_url_candidates(season_start_year: int) -> List[str]:
+    return [f"{BASE}/nba-cup-{season_start_year}/results/",
+            f"{BASE}/nba-in-season-tournament-{season_start_year}/results/",
             f"{BASE}/nba-cup/results/"]
 
 
@@ -96,7 +96,7 @@ class ResultRow:
     link: str = ""               # the game's page, for the missing-odds fallback
 
 
-def getLastPageNum(html: str) -> int:
+def get_last_page_num(html: str) -> int:
     """The highest page-number button on a results page (1 if none)."""
     soup = BeautifulSoup(html, "lxml")
     numbers = [int(b.get_text(strip=True)) for b in soup.find_all("button")
@@ -104,7 +104,7 @@ def getLastPageNum(html: str) -> int:
     return max(numbers, default=1)
 
 
-def _parseOdds(token: str) -> Optional[int]:
+def _parse_odds(token: str) -> Optional[int]:
     if token in ("-", ""):
         return None
     if not AMERICAN_ODDS.match(token):
@@ -112,7 +112,7 @@ def _parseOdds(token: str) -> Optional[int]:
     return int(token)
 
 
-def parseRowText(tokens: List[str]) -> Optional[dict]:
+def parse_row_text(tokens: List[str]) -> Optional[dict]:
     """Interpret one row's text pieces; None if it isn't a recognizable game row."""
     separators = [i for i, t in enumerate(tokens) if t == "-" and 0 < i < len(tokens) - 1
                   and not SCORE.match(tokens[i - 1]) and not SCORE.match(tokens[i + 1])]
@@ -125,12 +125,12 @@ def parseRowText(tokens: List[str]) -> Optional[dict]:
     away_score = int(after[0]) if after and SCORE.match(after[0]) else None
     if away_score is not None:
         after = after[1:]
-    odds = [_parseOdds(t) for t in after[:2]] + [None, None]
+    odds = [_parse_odds(t) for t in after[:2]] + [None, None]
     return dict(home=home, away=away, home_score=home_score, away_score=away_score,
                 home_odds=odds[0], away_odds=odds[1], status=tokens[0] if tokens else "")
 
 
-def parseResultsPage(html: str) -> List[ResultRow]:
+def parse_results_page(html: str) -> List[ResultRow]:
     """Every game row on a results page, in page order, with the date header above it."""
     soup = BeautifulSoup(html, "lxml")
     rows, header = [], None
@@ -138,7 +138,7 @@ def parseResultsPage(html: str) -> List[ResultRow]:
         if el.name == "a" and "/basketball/h2h/" in (el.get("href") or ""):
             if "#" not in el["href"]:
                 continue  # the pinned game: no game id in its link (see module docstring)
-            parsed = parseRowText(el.parent.get_text("|", strip=True).split("|"))
+            parsed = parse_row_text(el.parent.get_text("|", strip=True).split("|"))
             if parsed:
                 listed, stage = header if header else (None, "")
                 rows.append(ResultRow(listed_date=listed, stage=stage,
@@ -150,15 +150,15 @@ def parseResultsPage(html: str) -> List[ResultRow]:
     return rows
 
 
-def americanToDecimal(odds: int) -> float:
+def american_to_decimal(odds: int) -> float:
     return 1 + odds / 100 if odds > 0 else 1 + 100 / -odds
 
 
-def decimalToAmerican(decimal_odds: float) -> int:
+def decimal_to_american(decimal_odds: float) -> int:
     return round((decimal_odds - 1) * 100) if decimal_odds >= 2 else round(-100 / (decimal_odds - 1))
 
 
-def parseGamePageOdds(page_text: str) -> Optional[tuple]:
+def parse_game_page_odds(page_text: str) -> Optional[tuple]:
     """
     (home odds, away odds) averaged across the bookmakers listed on a game's
     own page, from its visible text - the fallback for a game the results
@@ -173,20 +173,20 @@ def parseGamePageOdds(page_text: str) -> Optional[tuple]:
     pairs = list(zip(odds[0::2], odds[1::2]))
     if not pairs or len(odds) % 2:
         return None
-    return tuple(decimalToAmerican(sum(americanToDecimal(p[side]) for p in pairs) / len(pairs))
+    return tuple(decimal_to_american(sum(american_to_decimal(p[side]) for p in pairs) / len(pairs))
                  for side in (0, 1))
 
 
-def isRegularSeason(row: ResultRow) -> bool:
+def is_regular_season(row: ResultRow) -> bool:
     """Regular-season games are listed under a plain date header; other stages add
     " - <stage>". A row above any header can't be classified, so it doesn't count."""
     return row.listed_date is not None and row.stage == ""
 
 
-def rowsFallInSeason(rows: List[ResultRow], seasonStartYear: int) -> bool:
+def rows_fall_in_season(rows: List[ResultRow], season_start_year: int) -> bool:
     """Whether every dated row falls within the season (Sep 1 to Aug 31) - used to
     confirm a generic URL (e.g. the latest NBA Cup edition) is the requested season's."""
-    start, end = date(seasonStartYear, 9, 1), date(seasonStartYear + 1, 8, 31)
+    start, end = date(season_start_year, 9, 1), date(season_start_year + 1, 8, 31)
     dated = [r.listed_date for r in rows if r.listed_date]
     return bool(dated) and all(start <= d <= end for d in dated)
 
@@ -195,9 +195,9 @@ def rowsFallInSeason(rows: List[ResultRow], seasonStartYear: int) -> bool:
 #   ROWS -> PER-TEAM GAMES                        #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-def buildTeamGames(rows: List[ResultRow], seasonStartYear: int) -> Dict[str, List[Game]]:
+def build_team_games(rows: List[ResultRow], season_start_year: int) -> Dict[str, List[TeamGame]]:
     """
-    Turn scraped rows into the pipeline's per-team games: two Game records
+    Turn scraped rows into the pipeline's per-team games: two TeamGame records
     per game (one from each side), each team's games in date order and
     numbered 1..N.
 
@@ -206,7 +206,7 @@ def buildTeamGames(rows: List[ResultRow], seasonStartYear: int) -> Dict[str, Lis
     game is ever listed twice.
     Listing order breaks ties within a date (a team never plays twice in one).
     """
-    games: Dict[str, List[Game]] = {}
+    games: Dict[str, List[TeamGame]] = {}
     seen = set()
     for row in rows:
         key = row.event_id or (row.listed_date, row.home, row.away)
@@ -223,15 +223,15 @@ def buildTeamGames(rows: List[ResultRow], seasonStartYear: int) -> Dict[str, Lis
         for team, opponent, won, win_odds, lose_odds in (
                 (row.home, row.away, home_won, row.home_odds, row.away_odds),
                 (row.away, row.home, not home_won, row.away_odds, row.home_odds)):
-            game = Game(team, opponent, won, win_odds, lose_odds, seasonStartYear,
-                        listedDate=row.listed_date)
+            game = TeamGame(team, opponent, won, win_odds, lose_odds, season_start_year,
+                        listed_date=row.listed_date)
             games.setdefault(team, []).append(game)
 
     for team_games in games.values():
         # Pages list newest first; reverse to oldest first, then a stable sort
         # by date puts rows from separate pages (e.g. the NBA Cup page) in place
         team_games.reverse()
-        team_games.sort(key=lambda g: g.listedDate or date.min)
+        team_games.sort(key=lambda g: g.listed_date or date.min)
         for n, game in enumerate(team_games, start=1):
-            game.gameNumber = n
+            game.game_number = n
     return games

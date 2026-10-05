@@ -78,7 +78,7 @@ tableau/
 ## API Endpoints
 
 - `POST /api/result-summary`
-    - Input: `seasonStartYear`, `team`, `prediction`, `wager`
+    - Input: `season_start_year`, `team`, `prediction`, `wager`
     - Output: aggregated outcomes grouped by favorite/underdog and result
 - `POST /api/top-bets`
     - Input: same payload

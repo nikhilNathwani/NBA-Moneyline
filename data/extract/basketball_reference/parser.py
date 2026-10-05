@@ -32,7 +32,7 @@ class ScheduleGame:
     result: str = ""      # "W" or "L", from this team's side
 
 
-def parseScheduleTable(html: str) -> List[ScheduleGame]:
+def parse_schedule_table(html: str) -> List[ScheduleGame]:
     """Parse every game row out of a team's basketball-reference schedule page."""
     soup = BeautifulSoup(html, "lxml")
     table = soup.find("table", id="games")
@@ -57,12 +57,12 @@ def parseScheduleTable(html: str) -> List[ScheduleGame]:
     return games
 
 
-def getTrueRegularSeasonOpponents(games: List[ScheduleGame]) -> List[str]:
+def get_true_regular_season_opponents(games: List[ScheduleGame]) -> List[str]:
     """The ordered opponent list for a team's true regular season (see below)."""
-    return [game.opponent for game in getTrueRegularSeasonGames(games)]
+    return [game.opponent for game in get_true_regular_season_games(games)]
 
 
-def getTrueRegularSeasonGames(games: List[ScheduleGame]) -> List[ScheduleGame]:
+def get_true_regular_season_games(games: List[ScheduleGame]) -> List[ScheduleGame]:
     """
     Return a team's true regular-season games in order: everything in the
     regular-season table except play-in games.

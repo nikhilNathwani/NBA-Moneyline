@@ -21,8 +21,9 @@ data/
                       real game, dated from the official schedule (build_game_records.py)
   load/               Steps 4-6: load into Postgres, update the web app's season
                       list, final check; plus the Tableau CSV export
-  util/               Shared pieces: the Game record, expected game counts per
-                      season (constants.py), console output
+  util/               Shared pieces: the TeamGame record (team_game.py - one
+                      team's side of a game), constants (the project root,
+                      expected game counts per season), console output
   tests/              The pytest suite - checks the *code*, never runs during
                       the pipeline. Mirrors the folders above
   sample_queries.sql  Handy SQL for inspecting the database by hand

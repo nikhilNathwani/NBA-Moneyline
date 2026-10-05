@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from typing import Dict, List
 
 from transform.build_game_records import GameRecord
-from util.paths import PROJECT_ROOT
+from util.constants import PROJECT_ROOT
 
 
 def get_postgres_connection():

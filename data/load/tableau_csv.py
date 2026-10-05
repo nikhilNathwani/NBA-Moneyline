@@ -16,7 +16,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 
-# Computed here rather than imported from util/paths.py: this runs as a
+# Computed here rather than imported from util/constants.py: this runs as a
 # standalone script (python3 data/load/tableau_csv.py), where util/ isn't importable
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv(os.path.join(ROOT, ".env.development.local"))

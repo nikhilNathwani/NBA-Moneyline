@@ -24,7 +24,7 @@ npm run dev
 
 ```bash
 # Test result summary endpoint
-curl "http://localhost:3000/api/result-summary?seasonStartYear=2024&team=Lakers"
+curl "http://localhost:3000/api/result-summary?season_start_year=2024&team=Lakers"
 ```
 
 **Expected:** JSON response with Lakers data
