@@ -113,7 +113,7 @@ def validate_scraped_data_against_schedule(team_games: Dict[str, List[TeamGame]]
                                             schedules: Dict[str, List[ScheduleGame]]) -> List[TeamScheduleComparison]:
     """
     Compare every team's scraped opponents against basketball-reference's
-    authoritative schedule (from extract.basketball_reference.fetcher.fetch_season_schedules).
+    authoritative schedule (from extract.basketball_reference.scraper.scrape_season).
     """
     results = []
     for team_full_name, true_games in schedules.items():

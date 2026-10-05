@@ -113,7 +113,7 @@ def match_to_schedule(team_games: Dict[str, List[TeamGame]],
     Args:
         team_games: scraped games straight from the scraper's output
             ({team: games}, game_number = position in OddsPortal's order)
-        schedules: basketball-reference's true schedules (fetch_season_schedules)
+        schedules: basketball-reference's true schedules (extract.basketball_reference.scraper.scrape_season)
 
     Returns one GameRecord per real game, plus how many games needed pass 2
     (listed out of date order on OddsPortal). Raises MatchError

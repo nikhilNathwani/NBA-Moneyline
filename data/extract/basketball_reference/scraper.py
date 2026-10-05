@@ -1,9 +1,10 @@
 """
-Fetches season-schedule pages from basketball-reference.com - the pipeline's
+Scrapes season schedules from basketball-reference.com - the pipeline's
 second data source, alongside OddsPortal. Its official schedule is what
 validate/ checks opponents against and what transform/ dates every game
-from. fetch_season_schedules is the entry point: fetch every team's page, then
-parse it (parser.py).
+from. scrape_season is the entry point: download every team's schedule page,
+then parse it (parser.py). The pages are static HTML, so a plain download
+does - unlike OddsPortal, no browser is needed.
 
 Kept separate from parser.py so the parsing logic can be unit
 tested against saved HTML fixtures with no network access, and so this
@@ -89,7 +90,7 @@ def fetch_all_team_schedules(season_start_year: int, cache_dir: str = None) -> d
     return html_by_team
 
 
-def fetch_season_schedules(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
+def scrape_season(season: int, cache_dir: Optional[str] = None) -> Dict[str, List[ScheduleGame]]:
     """
     Every team's true regular-season games from basketball-reference (IST
     knockout and play-in games excluded), as {team_full_name: games in order}.

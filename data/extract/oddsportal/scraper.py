@@ -230,17 +230,22 @@ class OddsPortalScraper:
         for row in rows:
             if row.home_odds is not None or row.home_score is None or not row.link:
                 continue
+            odds = None
             try:
                 self.driver.get("https://www.oddsportal.com" + row.link)
-                time.sleep(6)
-                odds = parse_game_page_odds(self.driver.find_element(By.TAG_NAME, "body").text)
+                # Wait for the bookmaker lines to render rather than a fixed pause
+                deadline = time.time() + 20
+                while odds is None and time.time() < deadline:
+                    time.sleep(1)
+                    odds = parse_game_page_odds(self.driver.find_element(By.TAG_NAME, "body").text)
             except Exception as e:
-                odds = None
                 print(f"  ⚠️  Couldn't read {row.home} vs {row.away}'s game page ({e.__class__.__name__})")
             if odds:
                 row.home_odds, row.away_odds = odds
                 print(f"  → {row.home} vs {row.away} ({row.listed_date}): no odds on the results page; "
                       f"averaged its game page's bookmakers: {odds[0]:+d} / {odds[1]:+d}")
+            else:
+                print(f"  ⚠️  {row.home} vs {row.away} ({row.listed_date}): no odds on its game page either")
 
     def scrape_season(self, season_start_year: int, cache_dir: Optional[str] = None) -> Dict[str, List[TeamGame]]:
         """
