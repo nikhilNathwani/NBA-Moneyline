@@ -1,9 +1,10 @@
 # Runs the data pipeline's pytest suite (data/tests) on every push and PR
 # that touches data/. Builds the venv the same way data/README.md does.
 #
-# The migration tests (tests/load/test_postgres.py) read the table
-# definitions from production, whose credentials don't belong in CI, so they
-# skip here (with their reason shown) - run them locally.
+# The migration tests (tests/load/test_postgres.py) start a throwaway
+# Postgres from the runner's preinstalled one, and read the production
+# tables' definitions using CI_POSTGRES_URL - a login (moneyline_ci) that can
+# read definitions only: no rows, no writes.
 name: Pipeline tests
 
 on:
@@ -26,5 +27,9 @@ jobs:
               run: |
                   uv venv --managed-python .venv
                   uv pip install --python .venv/bin/python -r requirements.txt
+            - name: Put the runner's Postgres on PATH (for the throwaway test database)
+              run: ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
             - name: Run the tests
+              env:
+                  POSTGRES_URL: ${{ secrets.CI_POSTGRES_URL }}
               run: .venv/bin/python -m pytest -rs
