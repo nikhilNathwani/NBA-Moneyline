@@ -1,0 +1,30 @@
+# Runs the data pipeline's pytest suite (data/tests) on every push and PR
+# that touches data/. Builds the venv the same way data/README.md does.
+#
+# The migration tests (tests/load/test_postgres.py) read the table
+# definitions from production, whose credentials don't belong in CI, so they
+# skip here (with their reason shown) - run them locally.
+name: Pipeline tests
+
+on:
+    push:
+        branches: [main]
+        paths: ["data/**", ".github/workflows/pipeline-tests.yml"]
+    pull_request:
+        paths: ["data/**", ".github/workflows/pipeline-tests.yml"]
+
+jobs:
+    pytest:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: data
+        steps:
+            - uses: actions/checkout@v7
+            - uses: astral-sh/setup-uv@v10
+            - name: Create the venv (Python version from data/.python-version)
+              run: |
+                  uv venv --managed-python .venv
+                  uv pip install --python .venv/bin/python -r requirements.txt
+            - name: Run the tests
+              run: .venv/bin/python -m pytest -rs
