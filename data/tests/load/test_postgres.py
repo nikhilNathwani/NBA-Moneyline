@@ -1,5 +1,5 @@
 """
-Tests for load.migrate_to_production against a real, throwaway Postgres
+Tests for load.postgres against a real, throwaway Postgres
 server. Migrations only ever write to that throwaway server; production is
 only *read*, once, for the current definitions of the `teams` and `games`
 tables and the `team_games` view, so the test database always matches the
@@ -24,9 +24,9 @@ import tempfile
 import psycopg2
 import pytest
 
-import load.migrate_to_production as migration
+import load.postgres as migration
 from util.paths import PROJECT_ROOT
-from transform.matching import GameRecord
+from transform.build_game_records import GameRecord
 
 POSTGRES_APP_BIN = "/Applications/Postgres.app/Contents/Versions/latest/bin"
 

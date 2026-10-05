@@ -7,29 +7,36 @@ of the production `games` table.
 Each real game on basketball-reference (date, both teams, winner) is matched
 to the two scraped rows that represent it: one from each team, naming the
 other as opponent, with the right winner, mirrored odds (each side's odds to
-win are the other side's odds to lose), and within MAX_POSITION_GAP places of
-the game's position in that team's real schedule. Every scraped row must be
-used exactly once.
+win are the other side's odds to lose), within MAX_POSITION_GAP places of
+the game's position in that team's real schedule, and - when the row has
+OddsPortal's date - within MAX_DATE_GAP of the real date (OddsPortal's
+dates can run a day ahead). The date check is what keeps repeat matchups a
+few days apart distinct when a team's list has a gap. Every scraped row
+must be used exactly once.
 
-Two passes:
+Three passes:
 1. Games whose rows sit at exactly the right position for both teams - the
    usual case, where everything agrees.
 2. The rest by elimination: repeatedly assign any game left with exactly one
    possible pair of rows. This handles games OddsPortal lists out of date
-   order (five in 2025-26).
+   order, and a team's later games shifting when one game is missing.
+3. When elimination stalls, a game with exactly one closest-dated candidate
+   pair gets it (e.g. the same teams on consecutive days), then elimination
+   resumes.
 Anything still ambiguous or unmatched raises MatchError rather than guessing.
 
 Pure logic, no network access.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List
 
 from util.game import Game
 from extract.basketball_reference.parser import AWAY, NEUTRAL, ScheduleGame
 
 MAX_POSITION_GAP = 8
+MAX_DATE_GAP = timedelta(days=1)
 
 
 @dataclass
@@ -76,7 +83,8 @@ def _real_games(schedules: Dict[str, List[ScheduleGame]]) -> List[dict]:
                 home_won = team_won if home == team else not team_won
             else:
                 home, away, home_won = team, g.opponent, team_won
-            games.append(dict(date=g.date, home=home, away=away, neutral=g.location == NEUTRAL,
+            games.append(dict(date=g.date, date_value=datetime.strptime(g.date, "%a, %b %d, %Y").date(),
+                              home=home, away=away, neutral=g.location == NEUTRAL,
                               home_won=home_won,
                               pos={team: n, g.opponent: position[g.opponent][(g.date, team)]}))
     return games
@@ -89,7 +97,8 @@ def _candidate_pairs(game: dict, rows: Dict[str, List[Game]]) -> set:
     def near(team, opponent, won):
         return [i for i, r in enumerate(rows.get(team, []))
                 if r.opponent == opponent and r.outcome == won
-                and abs(r.gameNumber - game["pos"][team]) <= MAX_POSITION_GAP]
+                and abs(r.gameNumber - game["pos"][team]) <= MAX_POSITION_GAP
+                and (r.listedDate is None or abs(r.listedDate - game["date_value"]) <= MAX_DATE_GAP)]
 
     home_rows = near(home, away, game["home_won"])
     away_rows = near(away, home, not game["home_won"])
@@ -133,9 +142,18 @@ def match_to_schedule(team_games: Dict[str, List[Game]],
 
     in_place = len(assigned)
 
-    # Pass 2: elimination
-    progress = True
-    while progress:
+    def date_gap(i, pair):
+        """Total days between the pair's OddsPortal dates and the real date."""
+        g = games[i]
+        rows_ = (team_games[g["home"]][pair[0]], team_games[g["away"]][pair[1]])
+        return sum(abs((r.listedDate - g["date_value"]).days) for r in rows_ if r.listedDate)
+
+    # Pass 2: elimination - any game with exactly one possible pair left gets
+    # it. Pass 3 (only when that stalls): a game whose candidates include
+    # exactly one closest-dated pair gets that pair - e.g. the same two teams
+    # on consecutive days, where both pairs fit within MAX_DATE_GAP - then
+    # elimination resumes.
+    while True:
         progress = False
         for i in range(len(games)):
             if i in assigned:
@@ -144,6 +162,18 @@ def match_to_schedule(team_games: Dict[str, List[Game]],
             if len(remaining) == 1:
                 assign(i, remaining[0])
                 progress = True
+        if progress:
+            continue
+        for i in range(len(games)):
+            if i in assigned:
+                continue
+            remaining = sorted((date_gap(i, p), p) for p in candidates[i] if free(i, p))
+            if len(remaining) > 1 and remaining[0][0] < remaining[1][0]:
+                assign(i, remaining[0][1])
+                progress = True
+                break
+        if not progress:
+            break
 
     unmatched = [games[i] for i in range(len(games)) if i not in assigned]
     if unmatched:

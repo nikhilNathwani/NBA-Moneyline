@@ -1,5 +1,5 @@
 """
-Tests for transform.matching using a small synthetic season (no network):
+Tests for transform.build_game_records using a small synthetic season (no network):
 four teams, three game days, built both as basketball-reference schedules
 and as scraper output.
 """
@@ -9,7 +9,7 @@ import datetime
 import pytest
 
 from util.game import Game
-from transform.matching import MatchError, match_to_schedule
+from transform.build_game_records import MatchError, match_to_schedule
 from extract.basketball_reference.parser import AWAY, HOME, NEUTRAL, ScheduleGame
 
 # (date, home, away, home_won, home_odds, away_odds, neutral)
@@ -108,3 +108,37 @@ def test_mismatched_odds_raise_instead_of_guessing():
     scraped["B"][0].loseOdds = -999  # B's row no longer mirrors A's
     with pytest.raises(MatchError):
         match_to_schedule(scraped, _schedules(SEASON))
+
+
+def test_team_missing_a_game_still_matches_its_other_games_by_date():
+    # A and B play twice, three days apart; A's first game (vs B) has no row,
+    # shifting A's later rows by one position
+    season = [("Mon, Nov 3, 2025", "A", "B", True, -150, 130, False),
+              ("Wed, Nov 5, 2025", "C", "A", False, 110, -130, False),
+              ("Thu, Nov 6, 2025", "A", "B", False, 120, -140, False)]
+    scraped = _scraped(season)
+    for team in ("A", "B"):
+        scraped[team] = [g for g in scraped[team] if not (g.opponent in ("A", "B") and g.winOdds in (-150, 130))]
+        for n, g in enumerate(scraped[team], 1):
+            g.gameNumber = n
+    for team, team_rows in scraped.items():
+        for g in team_rows:
+            g.listedDate = {("A", "C"): 5, ("C", "A"): 5}.get((team, g.opponent), 6)
+            g.listedDate = __import__("datetime").date(2025, 11, g.listedDate)
+    with pytest.raises(MatchError, match="1 game"):  # only the truly missing game fails
+        match_to_schedule(scraped, _schedules(season))
+
+
+def test_same_teams_on_consecutive_days_are_told_apart_by_date():
+    import datetime
+    season = [("Thu, Feb 19, 2026", "W", "I", True, -150, 130, False),
+              ("Fri, Feb 20, 2026", "W", "I", True, -160, 140, False)]
+    scraped = _scraped(season)
+    for team_rows in scraped.values():
+        for g, day in zip(team_rows, (19, 20)):
+            g.listedDate = datetime.date(2026, 2, day)
+    # Shift positions so pass 1 (exact position) can't settle it
+    for g in scraped["I"]:
+        g.gameNumber += 1
+    result = match_to_schedule(scraped, _schedules(season))
+    assert [(r.game_date.day, r.home_odds) for r in result.records] == [(19, -150), (20, -160)]

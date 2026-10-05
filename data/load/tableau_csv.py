@@ -3,7 +3,7 @@ Regenerates tableau/games.csv from the production Postgres database - the file
 the Tableau dashboard's data connection reads. Run this after a yearly data
 migration (data/main.py) so the dashboard picks up the new season.
 
-    python3 data/load/export_tableau_csv.py
+    python3 data/load/tableau_csv.py
 
 Then open tableau/NBA Moneyline.twbx (the live connection reads the new file),
 add the season to the Season parameter's list, and re-publish to Tableau Public.
