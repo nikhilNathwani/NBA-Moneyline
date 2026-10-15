@@ -43,7 +43,7 @@ function populateResultSummary(resultSummary, prediction, wager) {
 		profitUnderdogWins,
 		profitUnderdogLosses,
 		profitFavoriteWins,
-		profitFavoriteLosses
+		profitFavoriteLosses,
 	);
 }
 
@@ -132,7 +132,7 @@ function makeWinLossSection(
 	profitUnderdogWins,
 	profitUnderdogLosses,
 	profitFavoriteWins,
-	profitFavoriteLosses
+	profitFavoriteLosses,
 ) {
 	//Make win-loss banner
 	const winLossBanner = document.getElementById("win-loss-banner");
@@ -142,8 +142,8 @@ function makeWinLossSection(
 			? numUnderdogWins + numFavoriteWins
 			: -numUnderdogLosses - numFavoriteLosses
 		: totalProfit >= 0
-		? numUnderdogLosses + numFavoriteLosses
-		: -numUnderdogWins - numFavoriteWins;
+			? numUnderdogLosses + numFavoriteLosses
+			: -numUnderdogWins - numFavoriteWins;
 	populateResultElement({
 		element: winLossCount,
 		value: winLossCountValue,
@@ -172,7 +172,7 @@ function makeWinLossSection(
 			const prefix = teamState + "-" + outcome + "-";
 
 			const gameCount_chip = document.getElementById(
-				prefix + "gameCount"
+				prefix + "gameCount",
 			);
 			populateResultElement({
 				element: gameCount_chip,

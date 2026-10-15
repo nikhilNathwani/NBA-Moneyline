@@ -4,10 +4,10 @@ Simulates a simple NBA betting strategy against historical moneyline odds: pick 
 
 Shipped two ways:
 
-| | Link | Stack |
-|---|---|---|
+|                       | Link                                                                                            | Stack                                                                                                          |
+| --------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | **Tableau dashboard** | [public.tableau.com/…/NBAMoneyline](https://public.tableau.com/views/NBAMoneyline/NBAMoneyline) | Tableau Public — parameter-driven calculated fields, a running-total table calc, a favorite/underdog breakdown |
-| **Web app** | [nba-moneyline.vercel.app](https://nba-moneyline.vercel.app) | Node/Express + PostgreSQL + vanilla JS, deployed on Vercel |
+| **Web app**           | [nba-moneyline.vercel.app](https://nba-moneyline.vercel.app)                                    | Node/Express + PostgreSQL + vanilla JS, deployed on Vercel                                                     |
 
 Both are fed by the same Python/Selenium data pipeline (`data/`). The rest of this README covers the web app; see [Tableau dashboard](#tableau-dashboard) below for that version.
 

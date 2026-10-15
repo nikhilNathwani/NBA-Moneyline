@@ -27,6 +27,6 @@ const observer = new IntersectionObserver(
 	{
 		threshold: 0.2, // Trigger when <=20% of the element is in view
 		// rootMargin: "0% 0px 0px 0px",
-	}
+	},
 );
 observer.observe(filterContainer);

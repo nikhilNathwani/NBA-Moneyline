@@ -37,7 +37,7 @@ data/
 they're set-and-forget.)
 
 `extract/checks.py` vs. `tests/`: the checks are part of the pipeline and check
-each season's *data* every run; `tests/` checks that the code itself works.
+each season's _data_ every run; `tests/` checks that the code itself works.
 
 To poke at the database by hand, `sample_queries.sql` has ready-made queries
 (seasons, a team's season, records against each opponent, structure, sizes).
@@ -85,20 +85,19 @@ One season per run, by design: catching up after a gap means one run per season
 
 **Scrape both sources:**
 
-
--   **OddsPortal**: opens Chrome on the season's NBA results pages and reads every
-    regular-season game (two rows per game, one per team), switching the site to
-    American odds first. Each page is retried up to 3 times if it doesn't fully
-    load, and cached once it passes (see "scrape aborted mid-run" below). From
-    2023-24 on it also reads the NBA Cup page, because OddsPortal lists the
-    tournament's quarterfinals and semifinals there instead of with the NBA results;
-    they count toward the 82-game season (the final doesn't, and is left out). A
-    game listed without odds gets the average of the bookmakers on its own page.
--   **basketball-reference**: downloads every team's official schedule (play-in
-    games excluded) - the source of each game's date and home team, and what
-    the checks below compare opponents against. This needs network access to
-    basketball-reference.com: without it the season can't be loaded, since the
-    database needs each game's date.
+- **OddsPortal**: opens Chrome on the season's NBA results pages and reads every
+  regular-season game (two rows per game, one per team), switching the site to
+  American odds first. Each page is retried up to 3 times if it doesn't fully
+  load, and cached once it passes (see "scrape aborted mid-run" below). From
+  2023-24 on it also reads the NBA Cup page, because OddsPortal lists the
+  tournament's quarterfinals and semifinals there instead of with the NBA results;
+  they count toward the 82-game season (the final doesn't, and is left out). A
+  game listed without odds gets the average of the bookmakers on its own page.
+- **basketball-reference**: downloads every team's official schedule (play-in
+  games excluded) - the source of each game's date and home team, and what
+  the checks below compare opponents against. This needs network access to
+  basketball-reference.com: without it the season can't be loaded, since the
+  database needs each game's date.
 
 **Then check the scraped data** (`extract/checks.py`) before anything is
 transformed. First, each team's game count against that season's expected pattern
@@ -114,12 +113,12 @@ transformed. First, each team's game count against that season's expected patter
 ✅ Per-team distribution matches expectations: 30 teams @ 82
 ```
 
--   The scraper produces two rows per game, one per team, so 2,460 rows = 1,230 games.
--   Seasons are checked against their own format: all 30 at 82 normally (since
-    2023-24 that includes the NBA Cup quarterfinals and semifinals), all 30 at 72
-    in 2020-21. 2019-20 (the COVID bubble) has no fixed
-    pattern, so the count check doesn't apply and the opponent check below is the
-    check.
+- The scraper produces two rows per game, one per team, so 2,460 rows = 1,230 games.
+- Seasons are checked against their own format: all 30 at 82 normally (since
+  2023-24 that includes the NBA Cup quarterfinals and semifinals), all 30 at 72
+  in 2020-21. 2019-20 (the COVID bubble) has no fixed
+  pattern, so the count check doesn't apply and the opponent check below is the
+  check.
 
 Then every team's scraped opponents against the official schedule:
 
@@ -239,8 +238,8 @@ locally or production can't be reached.
 
 ## The database
 
-*As of 2026-10-04. The database itself is the source of truth (the migration tests
-read its definitions live); update this section when you change it.*
+_As of 2026-10-04. The database itself is the source of truth (the migration tests
+read its definitions live); update this section when you change it._
 
 Written by the pipeline, read by the web app (`app/queries/`) and the Tableau export.
 (The same Postgres database also holds Titan Tracker's three `titan*` tables.)
@@ -249,27 +248,27 @@ Logins: the app and pipeline connect as `default` (owns the tables).
 `moneyline_ci` is CI's login (the `CI_POSTGRES_URL` GitHub secret): it can read
 table definitions for the migration tests, but no rows, and can't write.
 Titan Tracker's `titan_editor` has no access to these tables - but it has a
-default grant on every *new* table `default` creates, so after adding a table here,
+default grant on every _new_ table `default` creates, so after adding a table here,
 run `REVOKE ALL ON <table> FROM titan_editor`.
 
 **`teams`**: one row per franchise.
 
-| Column | Type | Meaning |
-|---|---|---|
-| `team_id` | smallint | primary key |
-| `name` | varchar(255) | e.g. "Boston Celtics" (unique) |
+| Column    | Type         | Meaning                        |
+| --------- | ------------ | ------------------------------ |
+| `team_id` | smallint     | primary key                    |
+| `name`    | varchar(255) | e.g. "Boston Celtics" (unique) |
 
 **`games`**: one row per real game.
 
-| Column | Type | Meaning |
-|---|---|---|
-| `game_id` | integer | primary key (generated) |
-| `seasonstartyear` | integer | year the season started (2025 = 2025-26) |
-| `game_date` | date | when it was played (from basketball-reference) |
-| `home_team_id`, `away_team_id` | smallint | references `teams` |
-| `neutral_site` | boolean | played at a neutral venue (e.g. abroad); home/away is then alphabetical, for structure only |
-| `home_won` | boolean | true if the home team won |
-| `home_odds`, `away_odds` | integer | American moneyline odds on each team winning (e.g. 150, -200) |
+| Column                         | Type     | Meaning                                                                                     |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------------- |
+| `game_id`                      | integer  | primary key (generated)                                                                     |
+| `seasonstartyear`              | integer  | year the season started (2025 = 2025-26)                                                    |
+| `game_date`                    | date     | when it was played (from basketball-reference)                                              |
+| `home_team_id`, `away_team_id` | smallint | references `teams`                                                                          |
+| `neutral_site`                 | boolean  | played at a neutral venue (e.g. abroad); home/away is then alphabetical, for structure only |
+| `home_won`                     | boolean  | true if the home team won                                                                   |
+| `home_odds`, `away_odds`       | integer  | American moneyline odds on each team winning (e.g. 150, -200)                               |
 
 All columns are NOT NULL. Constraints: home and away teams must exist in `teams` and
 differ; a team can't be home twice (or away twice) on one date; the date must fall
@@ -286,18 +285,19 @@ Whole-season rules (all 30 teams play, no team plays twice on one date) span man
 rows, so the migration checks them (`load/postgres.py`).
 
 History (2026-10-04):
--   The odds columns changed from text (`"+150"`) to integer, and the table got its
-    first constraints.
--   The single `games` table (two rows per game, no dates or opponents) was
-    replaced by `teams` + one-row-per-game `games` + the `team_games` view. Every
-    old row was matched to its real game on basketball-reference, confirmed by
-    mirrored odds and winners, without re-scraping OddsPortal. The values were
-    unchanged except 26 game numbers in 2025-26 (see Notes).
--   The NBA Cup quarterfinals and semifinals for 2023-24, 2024-25 and 2025-26 (6
-    per season, 18 games) were added, so every team in those seasons has 82 games.
-    They were scraped from OddsPortal's NBA Cup pages and loaded through the same
-    checks; no existing game was changed. Their odds are OddsPortal's averages as of
-    that date (from 1, 2 and 3 bookmakers respectively - see Notes).
+
+- The odds columns changed from text (`"+150"`) to integer, and the table got its
+  first constraints.
+- The single `games` table (two rows per game, no dates or opponents) was
+  replaced by `teams` + one-row-per-game `games` + the `team_games` view. Every
+  old row was matched to its real game on basketball-reference, confirmed by
+  mirrored odds and winners, without re-scraping OddsPortal. The values were
+  unchanged except 26 game numbers in 2025-26 (see Notes).
+- The NBA Cup quarterfinals and semifinals for 2023-24, 2024-25 and 2025-26 (6
+  per season, 18 games) were added, so every team in those seasons has 82 games.
+  They were scraped from OddsPortal's NBA Cup pages and loaded through the same
+  checks; no existing game was changed. Their odds are OddsPortal's averages as of
+  that date (from 1, 2 and 3 bookmakers respectively - see Notes).
 
 The web app reads these live, so for any structural change, deploy app code that
 works with both the old and new structure first, then change the database.
@@ -306,68 +306,68 @@ works with both the old and new structure first, then change the database.
 
 ### Game counts or opponents don't match (Step 1 checks)
 
--   Check the regular season is actually complete.
--   The opponent check's output names the specific teams and opponents that are off - much
-    faster than reading raw counts.
--   A game OddsPortal lists without odds is filled from its own page (the average
-    of the bookmakers there); if that page has none either, the game is skipped and
-    shows up here as missing. Check the game on OddsPortal.
+- Check the regular season is actually complete.
+- The opponent check's output names the specific teams and opponents that are off - much
+  faster than reading raw counts.
+- A game OddsPortal lists without odds is filled from its own page (the average
+  of the bookmakers there); if that page has none either, the game is skipped and
+  shows up here as missing. Check the game on OddsPortal.
 
 ### "N consecutive pages failed to render" / scrape aborted mid-run
 
--   OddsPortal is very likely rate-limiting or blocking automated requests; the
-    scraper deliberately stops rather than produce an incomplete dataset.
--   Wait a while (at least tens of minutes; the exact cooldown isn't known) before
-    re-running - retrying immediately may extend the block.
--   A re-run resumes: every page that loaded successfully is cached in
-    `data/.oddsportal_cache/`. The cache is deleted once that season migrates.
--   If it keeps happening after a real wait, check in a normal browser whether
-    OddsPortal's site structure changed (it was redesigned in 2026, which needed a
-    scraper rewrite).
+- OddsPortal is very likely rate-limiting or blocking automated requests; the
+  scraper deliberately stops rather than produce an incomplete dataset.
+- Wait a while (at least tens of minutes; the exact cooldown isn't known) before
+  re-running - retrying immediately may extend the block.
+- A re-run resumes: every page that loaded successfully is cached in
+  `data/.oddsportal_cache/`. The cache is deleted once that season migrates.
+- If it keeps happening after a real wait, check in a normal browser whether
+  OddsPortal's site structure changed (it was redesigned in 2026, which needed a
+  scraper rewrite).
 
 ### Odds errors
 
--   "odds ... aren't in American format" means OddsPortal's odds-format setting
-    didn't take (the scraper sets it in the browser's local storage as
-    `op_oddsFormatId=3`); OddsPortal may have changed how it stores it.
--   Scraped data only lives in memory during a run: decline at the Step 3 prompt, fix the
-    scraper, and re-run rather than patching data mid-run.
+- "odds ... aren't in American format" means OddsPortal's odds-format setting
+  didn't take (the scraper sets it in the browser's local storage as
+  `op_oddsFormatId=3`); OddsPortal may have changed how it stores it.
+- Scraped data only lives in memory during a run: decline at the Step 3 prompt, fix the
+  scraper, and re-run rather than patching data mid-run.
 
 ### Migration fails
 
--   Check `POSTGRES_URL` in `.env.development.local` and your network connection.
--   A constraint name in the error (e.g. `games_home_team_once_per_day`,
-    `games_home_odds_american`), "teams not in the teams table" or "season checks
-    failed" means the data itself was rejected. Nothing was written,
-    so fix the cause and re-run.
+- Check `POSTGRES_URL` in `.env.development.local` and your network connection.
+- A constraint name in the error (e.g. `games_home_team_once_per_day`,
+  `games_home_odds_american`), "teams not in the teams table" or "season checks
+  failed" means the data itself was rejected. Nothing was written,
+  so fix the cause and re-run.
 
 ### Browser problems
 
--   Run without `--headless` to watch what's happening.
--   OddsPortal may have changed its site structure (the scraper may need updates).
--   "isn't archived under its own OddsPortal URL yet" is informational, not an error:
-    the most recently finished season is only reachable via OddsPortal's generic
-    current-results page until a newer season starts, and the scraper handles that.
+- Run without `--headless` to watch what's happening.
+- OddsPortal may have changed its site structure (the scraper may need updates).
+- "isn't archived under its own OddsPortal URL yet" is informational, not an error:
+  the most recently finished season is only reachable via OddsPortal's generic
+  current-results page until a newer season starts, and the scraper handles that.
 
 ## Notes
 
--   **No stored copies of the data**: scraped games live in memory during a run;
-    Postgres is the only source of truth. The page caches (`data/.oddsportal_cache/`,
-    `data/.bbref_cache/`) exist only so a failed run can resume cheaply - nothing
-    reads data from them - and are deleted after a successful migration.
--   **OddsPortal's odds aren't fixed over time**: they're averages across the
-    bookmakers OddsPortal has on record for each game, and that set changes - as of
-    October 2026 it was 1 bookmaker for 2023-24 games and 4 for 2025-26. Re-scraping
-    2025-26 three months after it was loaded gave identical odds for only 101 of
-    1,224 games, though the gaps were small (a median of 0.6 percentage points of
-    implied win probability, at most 2.3). So each season's odds are a snapshot of
-    when it was scraped (per git history: 2022-23 to 2024-25 in November 2025,
-    2025-26 in July 2026, the 18 NBA Cup games in October 2026; earlier seasons
-    before that).
--   **OddsPortal's listing order isn't always date order**: for 2025-26, five
-    games (BOS-MIN Nov 29, ATL-PHI Dec 14, POR-UTA Jan 5, ATL-IND Jan 26, DEN-HOU
-    Mar 11) were listed 1-3 places later than when they were played, so the old
-    table had 26 rows' game numbers off. Game numbers now come from real dates, which
-    fixed them. 2025-26 was the only season scraped from OddsPortal's generic
-    "current results" page (the others came from archived season pages), the likely
-    cause; not confirmed.
+- **No stored copies of the data**: scraped games live in memory during a run;
+  Postgres is the only source of truth. The page caches (`data/.oddsportal_cache/`,
+  `data/.bbref_cache/`) exist only so a failed run can resume cheaply - nothing
+  reads data from them - and are deleted after a successful migration.
+- **OddsPortal's odds aren't fixed over time**: they're averages across the
+  bookmakers OddsPortal has on record for each game, and that set changes - as of
+  October 2026 it was 1 bookmaker for 2023-24 games and 4 for 2025-26. Re-scraping
+  2025-26 three months after it was loaded gave identical odds for only 101 of
+  1,224 games, though the gaps were small (a median of 0.6 percentage points of
+  implied win probability, at most 2.3). So each season's odds are a snapshot of
+  when it was scraped (per git history: 2022-23 to 2024-25 in November 2025,
+  2025-26 in July 2026, the 18 NBA Cup games in October 2026; earlier seasons
+  before that).
+- **OddsPortal's listing order isn't always date order**: for 2025-26, five
+  games (BOS-MIN Nov 29, ATL-PHI Dec 14, POR-UTA Jan 5, ATL-IND Jan 26, DEN-HOU
+  Mar 11) were listed 1-3 places later than when they were played, so the old
+  table had 26 rows' game numbers off. Game numbers now come from real dates, which
+  fixed them. 2025-26 was the only season scraped from OddsPortal's generic
+  "current results" page (the others came from archived season pages), the likely
+  cause; not confirmed.

@@ -29,7 +29,7 @@ async function handleSubmit() {
 		populateResultSummary(
 			resultSummary,
 			filterValues.prediction,
-			filterValues.wager
+			filterValues.wager,
 		);
 		populateTopBets(topBets, filterValues.prediction, filterValues.wager);
 

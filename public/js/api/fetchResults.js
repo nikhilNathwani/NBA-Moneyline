@@ -9,7 +9,7 @@ async function fetchResultSummary({
 		seasonStartYear,
 		team,
 		prediction,
-		wager
+		wager,
 	);
 }
 

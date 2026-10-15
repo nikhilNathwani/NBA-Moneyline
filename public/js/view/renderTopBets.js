@@ -40,7 +40,7 @@ function populateTopBets(topThreeBets, prediction, wager) {
 
 		// Row I) Outcome
 		const gameTableOutcome = gameTable.querySelector(
-			"tr.result-chip-table-outcome"
+			"tr.result-chip-table-outcome",
 		);
 		populateResultElement({
 			element: gameTableOutcome.querySelector("td"),
@@ -51,7 +51,7 @@ function populateTopBets(topThreeBets, prediction, wager) {
 
 		// Row II) Odds
 		const gameTableOdds = gameTable.querySelector(
-			"tr.result-chip-table-odds"
+			"tr.result-chip-table-odds",
 		);
 		gameTableOdds.querySelector("th").textContent = prediction
 			? "Odds to Win"
@@ -65,7 +65,7 @@ function populateTopBets(topThreeBets, prediction, wager) {
 
 		// Row III) Wager
 		const gameTableWager = gameTable.querySelector(
-			"tr.result-chip-table-wager"
+			"tr.result-chip-table-wager",
 		);
 		populateResultElement({
 			element: gameTableWager.querySelector("td"),
@@ -76,7 +76,7 @@ function populateTopBets(topThreeBets, prediction, wager) {
 
 		// Row IV) Payout
 		const gameTablePayout = gameTable.querySelector(
-			"tr.result-chip-table-payout"
+			"tr.result-chip-table-payout",
 		);
 		populateResultElement({
 			element: gameTablePayout.querySelector("td"),
