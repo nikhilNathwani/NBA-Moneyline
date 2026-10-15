@@ -7,7 +7,9 @@
 		"start": "node server.js",
 		"dev": "NODE_ENV=development nodemon server.js",
 		"sync-env": "vercel env pull .env.development.local",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
 	},
 	"keywords": [],
 	"author": "",
@@ -18,9 +20,14 @@
 	},
 	"devDependencies": {
 		"dotenv": "^18.0.4",
-		"nodemon": "^3.1.14"
+		"nodemon": "^3.1.14",
+		"prettier": "^3.9.10"
 	},
 	"engines": {
 		"node": "24.x"
+	},
+	"prettier": {
+		"useTabs": true,
+		"tabWidth": 4
 	}
 }

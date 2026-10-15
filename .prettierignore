@@ -1,0 +1,6 @@
+# npm owns this file's formatting
+package-lock.json
+# Scraped HTML pages used as test fixtures; kept as captured
+data/tests/**/fixtures/
+# Written by Claude Code
+**/.claude/settings.local.json
