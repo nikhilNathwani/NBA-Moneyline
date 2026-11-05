@@ -21,6 +21,12 @@
 	font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Shows behind the app when the page bounces past its edges, and is what
+   Safari tints its bars with, so match the filter area instead of white */
+html {
+	background-color: var(--color-accent);
+}
+
 #app {
 	/* --width-filterContainer: 100%; */
 	--width-filterContainer: 400px;
@@ -229,7 +235,22 @@ button#return-to-filters {
 	font-size: 1rem;
 	font-weight: bold;
 
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.6ch;
+
 	cursor: pointer;
+}
+
+/* Solid up arrow; the stroke rounds its corners */
+button#return-to-filters .icon-up {
+	width: 1rem;
+	height: 1rem;
+	fill: currentColor;
+	stroke: currentColor;
+	stroke-width: 1.5;
+	stroke-linejoin: round;
 }
 
 /* Mobile adjustments*/
