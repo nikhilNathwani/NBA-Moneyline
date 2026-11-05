@@ -87,6 +87,11 @@ html {
 	color: var(--color-bg);
 }
 
+/* Even out the line lengths so a word isn't left alone on the last line */
+#filter-subtitle {
+	text-wrap: balance;
+}
+
 #filter-header h1 {
 	font-family: "Paytone One", sans-serif;
 	font-size: 2.5rem;
