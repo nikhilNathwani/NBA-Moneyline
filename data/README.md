@@ -2,7 +2,12 @@
 
 Scrapes a season of NBA moneyline odds and results from OddsPortal, checks the
 data, and loads it into the production Postgres database that the web app and
-the Tableau dashboard read. It runs once a year, after a regular season ends.
+the Tableau dashboard read. It was run once per season, after each regular season ended.
+
+> **No longer updated with new seasons.** The data covers 2016-17 through 2025-26,
+> and the web app and dashboard still work with it. The steps below are how each
+> season was added, kept for reference. OddsPortal redesigns its site from time to
+> time, so the scraper may need updating before it's run again.
 
 ## Layout
 
@@ -67,7 +72,7 @@ driver automatically (into `~/.cache/selenium`).
 dependencies" section of `requirements.txt` (the file is organized by hand -
 don't overwrite it with `uv pip freeze`), then re-run the `uv pip install` line above.
 
-## Running the yearly update
+## Adding a season
 
 Wait until the regular season is completely finished. Then:
 

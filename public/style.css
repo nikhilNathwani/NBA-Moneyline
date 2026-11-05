@@ -95,6 +95,18 @@
 	color: var(--color-bg);
 }
 
+/* "(through 2025-26)" note on the Season label */
+#filter-paragraph .label-row {
+	display: flex;
+	align-items: center;
+	gap: 0.35em;
+}
+
+#filter-paragraph .label-note {
+	font-size: 0.8rem;
+	opacity: 0.8;
+}
+
 #filter-paragraph select {
 	width: 100%;
 	height: 2rem;

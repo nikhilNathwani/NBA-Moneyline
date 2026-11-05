@@ -2,6 +2,8 @@
 
 Simulates a simple NBA betting strategy against historical moneyline odds: pick a team, season, prediction direction (bet on win vs. bet on loss), and wager size, and see what the season result would have been.
 
+**Status:** no longer updated with new seasons. The web app and the dashboard both still work, with the 2016-17 through 2025-26 regular seasons (11,979 games).
+
 Shipped two ways:
 
 |                       | Link                                                                                            | Stack                                                                                                          |
@@ -18,14 +20,14 @@ The **web app** lets a user choose a team, season, prediction direction (bet on 
 - A Node/Express API for querying outcomes
 - PostgreSQL for game and odds data
 - Vanilla JavaScript frontend for fast interaction
-- Python/Selenium scraping pipeline for annual data refresh
+- Python/Selenium scraping pipeline that collected the data, one season at a time
 
 ## Highlights
 
 - SQL-driven profitability and ROI calculations
 - Two focused API endpoints: result summary and top bets
 - Shared Express route factory to keep backend handlers DRY
-- Annual scraper workflow with verification and migration steps
+- Season-by-season scraper workflow with verification and migration steps
 - Production deployment pattern that mirrors local app behavior
 
 ## Tech Stack
@@ -67,7 +69,7 @@ data/
   util/                       # Shared data model, constants, and output formatting
   tests/                      # pytest suite, mirroring the folders above
   sample_queries.sql          # SQL for inspecting the database by hand
-  README.md                   # Setup, the yearly run, the database, troubleshooting
+  README.md                   # Setup, adding a season, the database, troubleshooting
 
 tableau/
   NBA Moneyline.twbx          # Published Tableau Public workbook
@@ -119,7 +121,7 @@ npm run sync-env
 
 ## Data Pipeline
 
-The `data/` directory contains the yearly ingestion flow:
+The `data/` directory contains the ingestion flow that collected each season:
 
 1. **Extract** one season: odds and results from OddsPortal, and the official
    schedule (dates, home/away) from basketball-reference - then check it: game
@@ -132,7 +134,7 @@ The `data/` directory contains the yearly ingestion flow:
    all checks passing or an explicit override; the tables' constraints reject bad
    rows too - then update the web app's season options
 
-See [`data/README.md`](data/README.md) for setup, the yearly run, and troubleshooting.
+See [`data/README.md`](data/README.md) for setup, how a season is added, and troubleshooting.
 
 ## Tableau dashboard
 
@@ -146,7 +148,7 @@ a data-analyst-portfolio rebuild of the same simulator.
 
 To edit: open the `.twbx` from this folder (not Tableau's default Workbooks folder) so the repo stays the source of truth, and re-publish to Tableau Public from here (same workbook name → replaces the existing viz, URL preserved). Custom team-logo shapes live in `~/Documents/My Tableau Repository/Shapes/NBA/` (Tableau requires shape sources there); the published `.twbx` bundles them.
 
-Annual data refresh: `python3 data/load/tableau_csv.py` regenerates `games.csv` from Postgres — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
+`games.csv` is generated from Postgres by `python3 data/load/tableau_csv.py`. It contains every game, so it also works as a backup of the database — see [`data/README.md`](data/README.md#afterwards-refresh-the-tableau-dashboard).
 
 ## Testing and Validation
 
