@@ -87,9 +87,9 @@ html {
 	color: var(--color-bg);
 }
 
-/* Even out the line lengths so a word isn't left alone on the last line */
+/* Rewrap the last lines so a word isn't left alone, keeping full width */
 #filter-subtitle {
-	text-wrap: balance;
+	text-wrap: pretty;
 }
 
 #filter-header h1 {
