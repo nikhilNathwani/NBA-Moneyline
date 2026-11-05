@@ -95,15 +95,8 @@
 	color: var(--color-bg);
 }
 
-/* "(through 2025-26)" note on the Season label */
-#filter-paragraph .label-row {
-	display: flex;
-	align-items: center;
-	gap: 0.35em;
-}
-
+/* "(through 2025-26)" on the Season label: same size, a little faded */
 #filter-paragraph .label-note {
-	font-size: 0.8rem;
 	opacity: 0.8;
 }
 
@@ -159,6 +152,10 @@ button#submit-button:active {
 }
 
 #data-source {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+
 	text-align: center;
 	/* padding: 2rem 0 3rem 0; */
 	color: hsl(0, 0%, 50%);

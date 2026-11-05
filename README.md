@@ -154,6 +154,17 @@ To edit: open the `.twbx` from this folder (not Tableau's default Workbooks fold
 
 For manual verification steps (API checks, local server checks, scraper-safe checks), see `TESTING.md`.
 
+## Lower-maintenance option
+
+Not done; kept here in case keeping the web app's backend running becomes a burden (repeated security fixes for `express`/`pg`, a problem with the Neon database, or Vercel retiring the Node version). Since no new seasons are being added, the data never changes, so the app could become a static site:
+
+- Export one small JSON file per team per season (about 300 files, 82 games each) and serve them with the site.
+- On View Results, the browser downloads that one file and does the result-summary and top-bets math (`app/queries/*.sql`) in JavaScript, using integer math to match SQL's rounding.
+- That removes Express, `pg`, the Neon database, its password and the Node runtime from the live site.
+- Before switching, check the new results match the current API for every team, season, prediction and wager (12,000 combinations), and keep Neon running for a while so the switch can be undone with one commit.
+
+Trade-off: the live app would no longer run on Express and PostgreSQL, so update this README's stack description (and any resume wording) to match. Deferred on 2026-11-04 because the backend wasn't causing problems: searches take about 0.15 s once the site is awake, and about 1.7 s after it's been idle, which the results animation mostly hides.
+
 ## Why This Project
 
 This project demonstrates full-stack ownership across data engineering, backend API design, and UI performance. It reflects practical engineering tradeoffs (query simplification, route abstraction, and data integrity verification) in a production-style workflow.
