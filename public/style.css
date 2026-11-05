@@ -221,7 +221,7 @@ button#return-to-filters {
 	width: 80%;
 	margin-inline: 10%;
 	height: 3rem;
-	border-width: 1px;
+	border: none;
 	border-top-left-radius: 8px;
 	border-top-right-radius: 8px;
 
@@ -235,18 +235,19 @@ button#return-to-filters {
 	font-size: 1rem;
 	font-weight: bold;
 
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 0.6ch;
-
 	cursor: pointer;
 }
 
-/* Solid up arrow; the stroke rounds its corners */
+/* Solid up arrow, sized just past the capital letters and centered on
+   them so it lines up with "Return" in every browser. The stroke
+   rounds its corners. 0.8em is a fallback for browsers without "cap". */
 button#return-to-filters .icon-up {
-	width: 1rem;
-	height: 1rem;
+	width: 0.8em;
+	height: 0.8em;
+	width: 1.1cap;
+	height: 1.1cap;
+	margin-right: 0.35em;
+	vertical-align: -0.05cap;
 	fill: currentColor;
 	stroke: currentColor;
 	stroke-width: 1.5;
